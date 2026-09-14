@@ -325,8 +325,73 @@
   }
 
   // ==========================================================
-  // SETUP FORM DYNAMIC CONFIGURATION
+  // SETUP FORM DYNAMIC CONFIGURATION & PLAYER SUGGESTIONS
   // ==========================================================
+
+  const LAST_PLAYERS_STORAGE_KEY = 'scoresheets_last_players';
+  const RECENT_PLAYERS_STORAGE_KEY = 'scoresheets_recent_players_pool';
+
+  function getLastPlayerNames() {
+    try {
+      const stored = localStorage.getItem(LAST_PLAYERS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+
+    // Fallback: search most recent game from gamesList or local games
+    const games = gamesList.length > 0 ? gamesList : getLocalGames();
+    for (const g of games) {
+      if (g.players && Array.isArray(g.players) && g.players.length > 0) {
+        const names = g.players.map(p => (p.name || '').trim()).filter(Boolean);
+        if (names.length > 0) return names;
+      }
+    }
+
+    return null;
+  }
+
+  function getAllRecentPlayerPool() {
+    const pool = new Set();
+    try {
+      const stored = localStorage.getItem(RECENT_PLAYERS_STORAGE_KEY);
+      if (stored) {
+        JSON.parse(stored).forEach(name => {
+          if (name && name.trim()) pool.add(name.trim());
+        });
+      }
+    } catch (e) {}
+
+    const games = gamesList.length > 0 ? gamesList : getLocalGames();
+    games.forEach(g => {
+      if (g.players && Array.isArray(g.players)) {
+        g.players.forEach(p => {
+          if (p.name && p.name.trim() && !p.name.startsWith('Player ')) {
+            pool.add(p.name.trim());
+          }
+        });
+      }
+    });
+
+    return Array.from(pool);
+  }
+
+  function saveLastPlayerNames(names) {
+    try {
+      const cleaned = names.map(n => n.trim()).filter(Boolean);
+      if (cleaned.length > 0) {
+        localStorage.setItem(LAST_PLAYERS_STORAGE_KEY, JSON.stringify(cleaned));
+        
+        // Also update recent pool
+        const pool = new Set(getAllRecentPlayerPool());
+        cleaned.forEach(n => {
+          if (!n.startsWith('Player ')) pool.add(n);
+        });
+        localStorage.setItem(RECENT_PLAYERS_STORAGE_KEY, JSON.stringify(Array.from(pool)));
+      }
+    } catch (e) {}
+  }
 
   function renderSetupGameTypeSelector() {
     const container = document.getElementById('setup-game-type-selector');
@@ -398,10 +463,58 @@
 
     const container = document.getElementById('player-inputs-container');
     container.innerHTML = '';
-    const defaultNames = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
+
+    const lastPlayers = getLastPlayerNames();
+    const defaultNames = (lastPlayers && lastPlayers.length > 0)
+      ? lastPlayers
+      : ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
+
     defaultNames.forEach((name, i) => {
       addPlayerInputRow(name, i + 1);
     });
+
+    renderSuggestedPlayerChips();
+  }
+
+  function renderSuggestedPlayerChips() {
+    const bar = document.getElementById('suggested-players-bar');
+    const chipsContainer = document.getElementById('suggested-players-chips');
+    const loadLastBtn = document.getElementById('btn-load-last-players');
+    if (!bar || !chipsContainer) return;
+
+    const lastPlayers = getLastPlayerNames();
+    if (loadLastBtn) {
+      if (lastPlayers && lastPlayers.length > 0) {
+        loadLastBtn.classList.remove('hidden');
+      } else {
+        loadLastBtn.classList.add('hidden');
+      }
+    }
+
+    const currentNames = Array.from(document.querySelectorAll('.player-name-input'))
+      .map(i => i.value.trim().toLowerCase());
+
+    const allRecent = getAllRecentPlayerPool();
+    const suggestions = allRecent.filter(name => !currentNames.includes(name.toLowerCase()));
+
+    if (suggestions.length > 0) {
+      bar.classList.remove('hidden');
+      chipsContainer.innerHTML = suggestions.slice(0, 10).map(name => `
+        <button type="button" class="player-chip-btn" data-player-name="${escapeHtml(name)}" title="Add ${escapeHtml(name)}">
+          ➕ ${escapeHtml(name)}
+        </button>
+      `).join('');
+
+      chipsContainer.querySelectorAll('.player-chip-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const name = btn.getAttribute('data-player-name');
+          addPlayerInputRow(name);
+          renderSuggestedPlayerChips();
+        });
+      });
+    } else {
+      bar.classList.add('hidden');
+    }
   }
 
   function addPlayerInputRow(defaultName = '', index = 1) {
@@ -415,11 +528,19 @@
       ${rowCount > 1 ? '<button type="button" class="btn btn-danger btn-sm btn-remove-player" title="Remove Player">✕</button>' : ''}
     `;
 
+    const input = div.querySelector('.player-name-input');
+    if (input) {
+      input.addEventListener('input', () => {
+        renderSuggestedPlayerChips();
+      });
+    }
+
     const removeBtn = div.querySelector('.btn-remove-player');
     if (removeBtn) {
       removeBtn.addEventListener('click', () => {
         div.remove();
         refreshPlayerIndices();
+        renderSuggestedPlayerChips();
       });
     }
     container.appendChild(div);
@@ -453,8 +574,10 @@
 
     const playerInputs = document.querySelectorAll('.player-name-input');
     const players = [];
+    const playerNames = [];
     playerInputs.forEach((input, i) => {
       const name = input.value.trim() || `Player ${i + 1}`;
+      playerNames.push(name);
       players.push({
         id: 'p_' + Date.now() + '_' + i,
         name: name,
@@ -467,6 +590,9 @@
       showToast('Please add at least one player', 'error');
       return;
     }
+
+    // Save player names to suggest for subsequent boards
+    saveLastPlayerNames(playerNames);
 
     let scoreType = gameConfig.scoreType;
     if (setupSelectedGameType === 'generic_rounds' && variant === 'lowest') {
@@ -1474,7 +1600,24 @@
 
     document.getElementById('btn-add-player-row').addEventListener('click', () => {
       addPlayerInputRow('', document.querySelectorAll('.player-name-input').length + 1);
+      renderSuggestedPlayerChips();
     });
+
+    const loadLastPlayersBtn = document.getElementById('btn-load-last-players');
+    if (loadLastPlayersBtn) {
+      loadLastPlayersBtn.addEventListener('click', () => {
+        const lastPlayers = getLastPlayerNames();
+        if (lastPlayers && lastPlayers.length > 0) {
+          const container = document.getElementById('player-inputs-container');
+          container.innerHTML = '';
+          lastPlayers.forEach((name, i) => {
+            addPlayerInputRow(name, i + 1);
+          });
+          renderSuggestedPlayerChips();
+          showToast('Loaded players from last game! 👥', 'info');
+        }
+      });
+    }
 
     document.getElementById('new-game-form').addEventListener('submit', (e) => {
       e.preventDefault();
