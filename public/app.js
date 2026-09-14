@@ -307,9 +307,42 @@
       }
       if (!auth) {
         auth = firebase.auth();
+        
+        // Configure session persistence
+        try {
+          const isMobile = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || '');
+          const persistence = isMobile ? firebase.auth.Auth.Persistence.SESSION : firebase.auth.Auth.Persistence.LOCAL;
+          auth.setPersistence(persistence).catch(() => {});
+        } catch (e) {}
+
+        // Listen for Auth changes
+        auth.onAuthStateChanged(user => {
+          currentUser = user;
+          updateAuthUI();
+          if (currentUser) {
+            closeSignInModal();
+            dismissSplashScreen();
+          }
+          loadGamesList();
+        });
+
+        // Check for redirect result if redirect sign-in was used
+        if (auth.getRedirectResult) {
+          auth.getRedirectResult().then(result => {
+            if (result && result.user) {
+              currentUser = result.user;
+              updateAuthUI();
+              closeSignInModal();
+              dismissSplashScreen();
+            }
+          }).catch(() => {});
+        }
       }
       if (!db) {
         db = firebase.firestore();
+        try {
+          db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+        } catch (e) {}
       }
       return !!auth;
     } catch (e) {
@@ -323,32 +356,9 @@
       if (window.firebase) {
         ensureFirebaseServices();
 
-        if (auth) {
-          // Configure session persistence
-          try {
-            const isMobile = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || '');
-            const persistence = isMobile ? firebase.auth.Auth.Persistence.SESSION : firebase.auth.Auth.Persistence.LOCAL;
-            auth.setPersistence(persistence).catch(() => {});
-          } catch (e) {}
-
-          auth.onAuthStateChanged(user => {
-            currentUser = user;
-            updateAuthUI();
-            if (currentUser) {
-              closeSignInModal();
-              dismissSplashScreen();
-            }
-            loadGamesList();
-          });
-        }
-
-        // Enable offline persistence in Firestore SDK for robust offline operation
-        if (db) {
-          try {
-            db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-              console.warn('Firestore offline persistence note:', err && err.code);
-            });
-          } catch (e) {}
+        if (auth && auth.currentUser) {
+          currentUser = auth.currentUser;
+          updateAuthUI();
         }
 
         if (!auth) {
@@ -435,19 +445,29 @@
     const authUserEmail = document.getElementById('auth-user-email');
     const activeSheetsSection = document.getElementById('section-active-sheets');
 
+    const user = currentUser || (auth && auth.currentUser);
+    if (user && !currentUser) {
+      currentUser = user;
+    }
+
     if (currentUser) {
-      authActionBtn.textContent = '👤 ' + (currentUser.displayName || currentUser.email || 'My Profile');
-      authActionBtn.title = 'View Profile & Stats';
+      const name = currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'My Profile');
+      if (authActionBtn) {
+        authActionBtn.textContent = '👤 ' + name;
+        authActionBtn.title = 'View Profile & Stats (' + (currentUser.email || name) + ')';
+      }
       if (signedOutPane) signedOutPane.style.display = 'none';
       if (signedInPane) signedInPane.style.display = 'block';
-      if (authUserName) authUserName.textContent = currentUser.displayName || 'Player';
+      if (authUserName) authUserName.textContent = currentUser.displayName || name || 'Player';
       if (authUserEmail) authUserEmail.textContent = currentUser.email || '';
       
       // Reveal active score sheets section
       if (activeSheetsSection) activeSheetsSection.classList.remove('hidden');
     } else {
-      authActionBtn.textContent = '👤 Sign In';
-      authActionBtn.title = 'Sign in or create account';
+      if (authActionBtn) {
+        authActionBtn.textContent = '👤 Sign In';
+        authActionBtn.title = 'Sign in or create account';
+      }
       if (signedOutPane) signedOutPane.style.display = 'block';
       if (signedInPane) signedInPane.style.display = 'none';
       
@@ -2070,14 +2090,22 @@
         }
 
         try {
-          await auth.signInWithEmailAndPassword(email, password);
+          const userCred = await auth.signInWithEmailAndPassword(email, password);
+          if (userCred && userCred.user) {
+            currentUser = userCred.user;
+            updateAuthUI();
+          }
           closeSignInModal();
           dismissSplashScreen();
           showToast('Signed in successfully!', 'success');
         } catch (err) {
           if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
             try {
-              await auth.createUserWithEmailAndPassword(email, password);
+              const userCred2 = await auth.createUserWithEmailAndPassword(email, password);
+              if (userCred2 && userCred2.user) {
+                currentUser = userCred2.user;
+                updateAuthUI();
+              }
               closeSignInModal();
               dismissSplashScreen();
               showToast('Account created and signed in!', 'success');
@@ -2328,7 +2356,11 @@
         provider.addScope('email');
         provider.addScope('profile');
         provider.setCustomParameters({ prompt: 'select_account' });
-        await auth.signInWithPopup(provider);
+        const result = await auth.signInWithPopup(provider);
+        if (result && result.user) {
+          currentUser = result.user;
+          updateAuthUI();
+        }
         closeSignInModal();
         dismissSplashScreen();
         showToast('Signed in successfully!', 'success');
