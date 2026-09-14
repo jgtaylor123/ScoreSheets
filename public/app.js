@@ -92,6 +92,7 @@
   let db = null;
   let auth = null;
   let firestoreUnsubscribe = null;
+  let activeSheetsFilter = 'open'; // 'open' | 'all'
 
   // Selected game in setup form
   let setupSelectedGameType = 'golf';
@@ -105,6 +106,50 @@
     activeSlotIdx: 0,
     directScore: 0
   };
+
+  // ==========================================================
+  // SPLASH SCREEN & AUTH MODAL LOGIC (Squares-Style)
+  // ==========================================================
+
+  function dismissSplashScreen() {
+    const splashScreen = document.getElementById('splash-screen');
+    if (splashScreen) {
+      splashScreen.classList.add('is-dismissed');
+      document.body.classList.remove('splash-active');
+      setTimeout(() => {
+        splashScreen.hidden = true;
+      }, 450);
+    }
+  }
+
+  function showSplashScreen() {
+    const splashScreen = document.getElementById('splash-screen');
+    if (splashScreen) {
+      splashScreen.hidden = false;
+      splashScreen.classList.remove('is-dismissed');
+      document.body.classList.add('splash-active');
+    }
+  }
+
+  function openSignInModal() {
+    const modal = document.getElementById('signin-modal');
+    if (modal) {
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      setTimeout(() => {
+        const emailInput = document.getElementById('email');
+        if (emailInput) emailInput.focus();
+      }, 50);
+    }
+  }
+
+  function closeSignInModal() {
+    const modal = document.getElementById('signin-modal');
+    if (modal) {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  }
 
   // ==========================================================
   // FIREBASE INITIALIZATION & SYNC
@@ -125,6 +170,11 @@
         auth.onAuthStateChanged(user => {
           currentUser = user;
           updateAuthUI();
+          if (currentUser) {
+            // Dismiss splash on successful auth
+            closeSignInModal();
+            dismissSplashScreen();
+          }
           loadGamesList();
         });
       } else {
@@ -178,17 +228,26 @@
     const signedInPane = document.getElementById('auth-signed-in-pane');
     const authUserName = document.getElementById('auth-user-name');
     const authUserEmail = document.getElementById('auth-user-email');
+    const activeSheetsSection = document.getElementById('section-active-sheets');
 
     if (currentUser) {
-      authActionBtn.textContent = '👤 ' + (currentUser.displayName || currentUser.email || 'My Account');
-      signedOutPane.style.display = 'none';
-      signedInPane.style.display = 'block';
-      authUserName.textContent = currentUser.displayName || 'Player';
-      authUserEmail.textContent = currentUser.email || '';
+      authActionBtn.textContent = '👤 ' + (currentUser.displayName || currentUser.email || 'Sign Out');
+      authActionBtn.title = 'Click to Sign Out';
+      if (signedOutPane) signedOutPane.style.display = 'none';
+      if (signedInPane) signedInPane.style.display = 'block';
+      if (authUserName) authUserName.textContent = currentUser.displayName || 'Player';
+      if (authUserEmail) authUserEmail.textContent = currentUser.email || '';
+      
+      // Reveal active score sheets section
+      if (activeSheetsSection) activeSheetsSection.classList.remove('hidden');
     } else {
       authActionBtn.textContent = '👤 Sign In';
-      signedOutPane.style.display = 'block';
-      signedInPane.style.display = 'none';
+      authActionBtn.title = 'Sign in or create account';
+      if (signedOutPane) signedOutPane.style.display = 'block';
+      if (signedInPane) signedInPane.style.display = 'none';
+      
+      // Hide active score sheets section when not authenticated
+      if (activeSheetsSection) activeSheetsSection.classList.add('hidden');
     }
   }
 
@@ -543,6 +602,10 @@
   }
 
   function renderGamesList(games) {
+    // 1. Render Active Open Sheets on Authenticated Home Screen
+    renderActiveSheetsSection(games);
+
+    // 2. Render General Match History
     const listContainer = document.getElementById('games-list-container');
     if (games.length === 0) {
       listContainer.innerHTML = `
@@ -605,7 +668,7 @@
             <span class="meta-pill">${variantDisplay}</span>
             <span class="meta-pill">${roundLabel}</span>
             <span class="meta-pill">${game.players.length} Players</span>
-            ${game.completed ? '<span class="meta-pill completed">Completed</span>' : ''}
+            ${game.completed ? '<span class="meta-pill completed">Completed</span>' : '<span class="meta-pill" style="background: rgba(34, 197, 94, 0.2); color: var(--fairway-light);">● In Progress</span>'}
           </div>
           <div class="game-item-leader">
             <span>${leaderText}</span>
@@ -629,6 +692,165 @@
     listContainer.querySelectorAll('.btn-delete-card').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        const gId = btn.getAttribute('data-game-id');
+        deleteGame(gId);
+      });
+    });
+
+    // 3. Update Manage Sheets view if currently opened
+    renderManageSheetsTable(games);
+  }
+
+  // Render Active / Open Sheets for Authenticated Users
+  function renderActiveSheetsSection(games) {
+    const section = document.getElementById('section-active-sheets');
+    const grid = document.getElementById('active-sheets-grid');
+    if (!section || !grid) return;
+
+    if (!currentUser) {
+      section.classList.add('hidden');
+      return;
+    }
+
+    section.classList.remove('hidden');
+
+    // Filter games
+    let filtered = games;
+    if (activeSheetsFilter === 'open') {
+      filtered = games.filter(g => !g.completed);
+    }
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column: 1/-1; padding: 2rem 1.5rem;">
+          <div class="empty-state-icon">⛳</div>
+          <h4>${activeSheetsFilter === 'open' ? 'No Open Matches In Progress' : 'No Saved Matches Found'}</h4>
+          <p>Start a new game sheet or view completed games in match history.</p>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-active-new-sheet" style="margin-top: 0.75rem;">
+            ➕ Start Match
+          </button>
+        </div>
+      `;
+      const btn = document.getElementById('btn-active-new-sheet');
+      if (btn) btn.addEventListener('click', () => {
+        initSetupForm('golf');
+        showView('view-setup');
+      });
+      return;
+    }
+
+    grid.innerHTML = filtered.map(game => {
+      const gType = game.gameType || 'golf';
+      const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+      const isLowestWins = game.scoreType === 'lowest';
+
+      let leaderText = 'In progress';
+      const playerTotals = game.players.map(p => {
+        const sum = p.scores.reduce((acc, s) => s !== null ? acc + s : acc, 0);
+        const playedCount = p.scores.filter(s => s !== null).length;
+        return { name: p.name, sum, playedCount };
+      });
+
+      const activePlayers = playerTotals.filter(p => p.playedCount > 0);
+      if (activePlayers.length > 0) {
+        if (isLowestWins) activePlayers.sort((a, b) => a.sum - b.sum);
+        else activePlayers.sort((a, b) => b.sum - a.sum);
+        leaderText = `Current 1st: <strong>${escapeHtml(activePlayers[0].name)} (${activePlayers[0].sum} pts)</strong>`;
+      }
+
+      return `
+        <div class="game-item-card" data-game-id="${escapeHtml(game.id)}" style="border-color: rgba(34, 197, 94, 0.4);">
+          <div class="game-item-top">
+            <h4 class="game-item-title">${gameConfig.icon} ${escapeHtml(game.title)}</h4>
+            <span class="meta-pill" style="background: rgba(34, 197, 94, 0.2); color: var(--fairway-light);">● OPEN</span>
+          </div>
+          <div class="game-item-meta">
+            <span class="meta-pill variant">${escapeHtml(gameConfig.name)}</span>
+            <span class="meta-pill">${game.holes} ${gameConfig.roundPlural}</span>
+            <span class="meta-pill">${game.players.length} Players</span>
+          </div>
+          <div class="game-item-leader">
+            <span>${leaderText}</span>
+          </div>
+          <div class="game-item-actions">
+            <button type="button" class="btn btn-primary btn-sm btn-open-active-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Resume Match ➔</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('.btn-open-active-game').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gId = btn.getAttribute('data-game-id');
+        const found = gamesList.find(g => g.id === gId);
+        if (found) openGame(found);
+      });
+    });
+  }
+
+  // Render Manage Sheets Table
+  function renderManageSheetsTable(games) {
+    const tbody = document.getElementById('manage-sheets-tbody');
+    if (!tbody) return;
+
+    if (games.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No score sheets found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = games.map(game => {
+      const gType = game.gameType || 'golf';
+      const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+      const formattedDate = new Date(game.createdAt || Date.now()).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric'
+      });
+
+      return `
+        <tr>
+          <td><strong>${escapeHtml(game.title)}</strong></td>
+          <td>${gameConfig.icon} ${escapeHtml(gameConfig.name)}</td>
+          <td>
+            ${game.completed 
+              ? '<span class="meta-pill completed">Completed</span>' 
+              : '<span class="meta-pill" style="background: rgba(34, 197, 94, 0.2); color: var(--fairway-light);">In Progress</span>'}
+          </td>
+          <td>${game.players.length}</td>
+          <td>${formattedDate}</td>
+          <td style="text-align: right;">
+            <div class="manage-actions-cell" style="justify-content: flex-end;">
+              <button type="button" class="btn btn-primary btn-sm btn-manage-open" data-game-id="${escapeHtml(game.id)}">Open</button>
+              <button type="button" class="btn btn-outline btn-sm btn-manage-toggle" data-game-id="${escapeHtml(game.id)}" title="Toggle Status">${game.completed ? 'Reopen' : 'Finish'}</button>
+              <button type="button" class="btn btn-danger btn-sm btn-manage-del" data-game-id="${escapeHtml(game.id)}" title="Delete">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('.btn-manage-open').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gId = btn.getAttribute('data-game-id');
+        const found = gamesList.find(g => g.id === gId);
+        if (found) openGame(found);
+      });
+    });
+
+    tbody.querySelectorAll('.btn-manage-toggle').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const gId = btn.getAttribute('data-game-id');
+        const found = gamesList.find(g => g.id === gId);
+        if (found) {
+          found.completed = !found.completed;
+          await saveGame(found);
+          loadGamesList();
+          showToast(found.completed ? 'Match marked as completed' : 'Match reopened', 'info');
+        }
+      });
+    });
+
+    tbody.querySelectorAll('.btn-manage-del').forEach(btn => {
+      btn.addEventListener('click', () => {
         const gId = btn.getAttribute('data-game-id');
         deleteGame(gId);
       });
@@ -980,6 +1202,153 @@
   }
 
   function setupEventListeners() {
+    // Splash Screen & Sign-in Modal Triggers
+    const enterAppBtn = document.getElementById('enter-app');
+    if (enterAppBtn) {
+      enterAppBtn.addEventListener('click', () => {
+        openSignInModal();
+      });
+    }
+
+    const closeSigninBtn = document.getElementById('close-signin');
+    if (closeSigninBtn) {
+      closeSigninBtn.addEventListener('click', () => {
+        closeSignInModal();
+      });
+    }
+
+    const modalGoogleSigninBtn = document.getElementById('modal-google-signin');
+    if (modalGoogleSigninBtn) {
+      modalGoogleSigninBtn.addEventListener('click', () => {
+        const btnGoogle = document.getElementById('btn-google-sign-in');
+        if (btnGoogle) btnGoogle.click();
+      });
+    }
+
+    const guestEntryBtn = document.getElementById('btn-guest-entry');
+    if (guestEntryBtn) {
+      guestEntryBtn.addEventListener('click', () => {
+        closeSignInModal();
+        dismissSplashScreen();
+        showToast('Playing as Guest in local offline mode', 'info');
+      });
+    }
+
+    // Password Toggle
+    const togglePasswordBtn = document.getElementById('toggle-password');
+    if (togglePasswordBtn) {
+      togglePasswordBtn.addEventListener('click', () => {
+        const passInput = document.getElementById('password');
+        if (passInput) {
+          passInput.type = passInput.type === 'password' ? 'text' : 'password';
+        }
+      });
+    }
+
+    // Email Login / Signup Form
+    const emailForm = document.getElementById('email-login-form');
+    if (emailForm) {
+      emailForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        if (!email || !password) {
+          alert('Email and password are required.');
+          return;
+        }
+        if (!auth) {
+          showToast('Firebase Auth is ready once hosted on Firebase!', 'info');
+          closeSignInModal();
+          dismissSplashScreen();
+          return;
+        }
+
+        try {
+          await auth.signInWithEmailAndPassword(email, password);
+          closeSignInModal();
+          dismissSplashScreen();
+          showToast('Signed in successfully!', 'success');
+        } catch (err) {
+          if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+            try {
+              await auth.createUserWithEmailAndPassword(email, password);
+              closeSignInModal();
+              dismissSplashScreen();
+              showToast('Account created and signed in!', 'success');
+            } catch (err2) {
+              if (err2.code === 'auth/email-already-in-use') {
+                alert('Incorrect password. Please try again or use Forgot password.');
+              } else if (err2.code === 'auth/weak-password') {
+                alert('Password is too weak. Use at least 6 characters.');
+              } else {
+                alert('Sign up failed: ' + err2.message);
+              }
+            }
+          } else {
+            alert('Sign in failed: ' + err.message);
+          }
+        }
+      });
+    }
+
+    // Password Reset
+    const resetPasswordBtn = document.getElementById('resetPassword');
+    if (resetPasswordBtn) {
+      resetPasswordBtn.addEventListener('click', async () => {
+        const email = document.getElementById('email').value.trim();
+        if (!email) {
+          alert('Please enter your email in the field first.');
+          return;
+        }
+        if (!auth) {
+          alert('Authentication is active on the deployed URL.');
+          return;
+        }
+        try {
+          await auth.sendPasswordResetEmail(email);
+          alert('Password reset email sent. Please check your inbox.');
+        } catch (err) {
+          alert('Password reset failed: ' + err.message);
+        }
+      });
+    }
+
+    // Active Sheets Filter Pills (Open vs All)
+    const filterPills = document.querySelectorAll('#active-sheets-filter .filter-pill');
+    filterPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        filterPills.forEach(p => p.classList.remove('is-active'));
+        pill.classList.add('is-active');
+        activeSheetsFilter = pill.getAttribute('data-filter') || 'open';
+        renderActiveSheetsSection(gamesList);
+      });
+    });
+
+    // Manage Sheets Navigation & Actions
+    const manageNavBtn = document.getElementById('btn-nav-manage-sheets');
+    if (manageNavBtn) {
+      manageNavBtn.addEventListener('click', () => {
+        renderManageSheetsTable(gamesList);
+        showView('view-manage-sheets');
+      });
+    }
+
+    const manageBackHomeBtn = document.getElementById('btn-manage-back-home');
+    if (manageBackHomeBtn) {
+      manageBackHomeBtn.addEventListener('click', () => {
+        loadGamesList();
+        showView('view-home');
+      });
+    }
+
+    const manageNewSheetBtn = document.getElementById('btn-manage-new-sheet');
+    if (manageNewSheetBtn) {
+      manageNewSheetBtn.addEventListener('click', () => {
+        initSetupForm('golf');
+        showView('view-setup');
+      });
+    }
+
     // Nav Brand & Buttons
     document.getElementById('nav-brand').addEventListener('click', () => {
       loadGamesList();
@@ -1090,7 +1459,16 @@
     // Auth Modal Actions
     const authModal = document.getElementById('modal-auth');
     document.getElementById('btn-auth-action').addEventListener('click', () => {
-      authModal.classList.add('is-open');
+      if (currentUser && auth) {
+        if (confirm('Do you want to sign out?')) {
+          auth.signOut().then(() => {
+            showToast('Signed out', 'info');
+            showSplashScreen();
+          });
+        }
+      } else {
+        openSignInModal();
+      }
     });
 
     document.getElementById('btn-close-auth-modal').addEventListener('click', () => {

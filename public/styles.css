@@ -1,6 +1,6 @@
 /* ==========================================================
-   Golf Card Game Scorekeeper - Main Stylesheet
-   Theme: Luxury Clubhouse & Fairway Green
+   Golf & Tabletop ScoreSheets - Main Stylesheet
+   Theme: Luxury Clubhouse & Settle the Score Neon Green/Gold
    ========================================================== */
 
 :root {
@@ -58,6 +58,359 @@ body {
   flex-direction: column;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+body.splash-active {
+  overflow: hidden;
+}
+
+/* ==========================================================
+   Branded Splash Screen (Settle the Score)
+   ========================================================== */
+
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 20%, #0d3826 0%, #03140e 80%);
+  z-index: 2000;
+  opacity: 1;
+  transition: opacity 420ms ease, visibility 420ms ease;
+}
+
+.splash-screen.is-dismissed {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-panel {
+  position: relative;
+  width: min(1080px, 100%);
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--border-fairway);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, rgba(16, 56, 40, 0.95), rgba(6, 26, 18, 0.98));
+  color: #ffffff;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+  animation: splash-rise 700ms ease both;
+}
+
+.splash-panel::before, .splash-panel::after {
+  position: absolute;
+  content: '';
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.splash-panel::before {
+  width: 380px;
+  height: 380px;
+  top: -180px;
+  right: -60px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.25) 0%, transparent 70%);
+  filter: blur(20px);
+}
+
+.splash-panel::after {
+  width: 320px;
+  height: 320px;
+  bottom: -160px;
+  left: 60px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%);
+  filter: blur(25px);
+}
+
+.splash-content {
+  position: relative;
+  z-index: 2;
+  padding: 56px 58px 58px;
+}
+
+.splash-kicker {
+  margin: 0 0 12px;
+  color: var(--accent-gold);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.splash-content h1 {
+  max-width: 720px;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(38px, 5.5vw, 62px);
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.splash-content h1 strong {
+  display: block;
+  background: linear-gradient(135deg, #4ade80 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.splash-subtitle {
+  max-width: 620px;
+  margin: 18px 0 32px;
+  color: var(--text-sub);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.splash-steps {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  max-width: 980px;
+}
+
+.splash-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 120px;
+  padding: 18px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.splash-step-action {
+  border-color: var(--fairway-green);
+  cursor: pointer;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.splash-step-action:hover {
+  background: rgba(34, 197, 94, 0.22);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.25);
+}
+
+.splash-step-number {
+  flex: 0 0 auto;
+  color: var(--fairway-light);
+  font-size: 14px;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  background: rgba(34, 197, 94, 0.2);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.splash-step:nth-child(2) .splash-step-number {
+  color: var(--accent-gold);
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.splash-step:nth-child(3) .splash-step-number {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.2);
+}
+
+.splash-step strong, .splash-step small {
+  display: block;
+}
+
+.splash-step strong {
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.splash-step small {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.splash-note {
+  position: absolute;
+  right: 28px;
+  bottom: 20px;
+  z-index: 2;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Background Card/Score graphic in splash */
+.splash-bg-decor {
+  position: absolute;
+  right: -80px;
+  bottom: -100px;
+  width: 480px;
+  opacity: 0.12;
+  pointer-events: none;
+  transform: rotate(-12deg);
+}
+
+/* ==========================================================
+   Squares-Style Sign-In Modal (Google + Email)
+   ========================================================== */
+
+.signin-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(4, 18, 12, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 220ms ease, visibility 220ms ease;
+  z-index: 2500;
+}
+
+.signin-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.signin-dialog {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 34px 30px 28px;
+  border: 1px solid var(--border-fairway);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+  animation: splash-rise 250ms ease both;
+}
+
+.signin-dialog h2 {
+  margin: 0 0 6px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.signin-subtitle {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 22px;
+}
+
+.signin-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+}
+
+.signin-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.signin-google {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.signin-google:hover {
+  background: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.signin-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.signin-divider::before, .signin-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+  content: '';
+}
+
+.signin-dialog #email-auth {
+  padding: 0;
+  max-width: none;
+}
+
+.signin-dialog input {
+  margin: 8px 0;
+}
+
+.signin-dialog .hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  margin-top: 12px;
+}
+
+.signin-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0 6px;
+}
+
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Header & Nav */
@@ -483,6 +836,100 @@ body {
 .feature-desc {
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+/* Section Badges and Filters */
+.section-kicker {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-gold);
+  margin-bottom: 0.25rem;
+}
+
+.boards-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.boards-heading h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 0.4rem;
+  background: var(--bg-surface);
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.filter-pill {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-pill.is-active {
+  background: var(--fairway-green);
+  color: #ffffff;
+}
+
+/* Management Table in Manage Sheets View */
+.manage-table-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.manage-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.manage-table th, .manage-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.manage-table th {
+  background: var(--bg-secondary);
+  font-weight: 700;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.manage-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.manage-actions-cell {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.hidden {
+  display: none !important;
 }
 
 /* Saved Games List */
