@@ -1566,6 +1566,17 @@
       firestoreUnsubscribe = null;
     }
 
+    // Keep URL parameter synchronized so refreshing stays on the active scorecard
+    try {
+      if (game && game.id) {
+        localStorage.setItem('scoresheets_last_opened_game_id', game.id);
+        const newUrl = window.location.origin + window.location.pathname + '?game=' + encodeURIComponent(game.id);
+        if (window.location.search !== '?game=' + game.id) {
+          window.history.replaceState({ gameId: game.id }, '', newUrl);
+        }
+      }
+    } catch (e) {}
+
     dismissSplashScreen();
     renderScorecard();
     showView('view-scorecard');
@@ -1597,7 +1608,7 @@
       chipsDrawer.classList.add('is-open');
       toggleBtn.classList.add('is-active');
       toggleBtn.setAttribute('aria-expanded', 'true');
-      if (toggleText) toggleText.textContent = 'Hide Details';
+      if (toggleText) toggleText.textContent = 'Hide';
     } else {
       chipsDrawer.classList.remove('is-open');
       toggleBtn.classList.remove('is-active');
@@ -2252,6 +2263,12 @@
 
     // Nav Brand & Buttons
     document.getElementById('nav-brand').addEventListener('click', () => {
+      try {
+        localStorage.removeItem('scoresheets_last_opened_game_id');
+        if (window.location.search) {
+          window.history.replaceState({}, '', window.location.origin + window.location.pathname);
+        }
+      } catch (e) {}
       loadGamesList();
       showView('view-home');
     });
@@ -2305,6 +2322,12 @@
     });
 
     document.getElementById('btn-back-to-home').addEventListener('click', () => {
+      try {
+        localStorage.removeItem('scoresheets_last_opened_game_id');
+        if (window.location.search) {
+          window.history.replaceState({}, '', window.location.origin + window.location.pathname);
+        }
+      } catch (e) {}
       loadGamesList();
       showView('view-home');
     });
@@ -2504,35 +2527,41 @@
     document.addEventListener('touchstart', onFirstUserInteraction, { passive: true });
     document.addEventListener('click', onFirstUserInteraction, { passive: true });
 
-    // Check URL parameters for direct game link: ?game=xyz
+    // Check URL parameters or saved active session for direct game reload: ?game=xyz
     const urlParams = new URLSearchParams(window.location.search);
-    const linkedGameId = urlParams.get('game');
-    if (linkedGameId) {
-      const loadLinkedGame = async () => {
-        // 1. Check local storage first
-        let local = getLocalGames().find(g => g.id === linkedGameId);
+    let targetGameId = urlParams.get('game');
+    if (!targetGameId) {
+      try {
+        targetGameId = localStorage.getItem('scoresheets_last_opened_game_id');
+      } catch (e) {}
+    }
+
+    if (targetGameId) {
+      const loadTargetGame = async () => {
+        // 1. Check local storage first (instant offline reload)
+        let local = getLocalGames().find(g => g.id === targetGameId);
         if (local) {
           openGame(local);
         }
 
-        // 2. Fetch latest version from Firestore
+        // 2. Fetch latest version from Firestore if available
         if (db) {
           try {
-            const doc = await db.collection('games').doc(linkedGameId).get();
+            const doc = await db.collection('games').doc(targetGameId).get();
             if (doc.exists) {
               const cloudGame = doc.data();
               saveLocalGames([cloudGame, ...getLocalGames().filter(g => g.id !== cloudGame.id)]);
               openGame(cloudGame);
             }
           } catch (e) {
-            console.warn('Could not fetch linked game from Firestore:', e);
+            console.warn('Could not fetch game from Firestore:', e);
           }
         }
       };
 
       // Run immediately and after a short delay for DB init
-      loadLinkedGame();
-      setTimeout(loadLinkedGame, 600);
+      loadTargetGame();
+      setTimeout(loadTargetGame, 600);
     }
   }
 
