@@ -9,7 +9,7 @@ A modern, real-time multiplayer digital scorekeeper and match tracker for tablet
 ### 1. ⛳ Golf Card Game
 - **Fast Hole Score Reporting**: Quick points pad, increment/decrement steppers, and direct numeric input.
 - **Game Formats**: 4-card, 6-card, 8-card, and 9-card Golf across 6, 9, or 18 holes.
-- **Built-In Rules Reference**: Quick lookup for Jokers ($-2$ pts), Kings ($0$ pts), Aces ($1$ pt), Face cards ($10$ pts), and vertical column pair cancellations ($0$ pts).
+- **Built-In Rules Reference**: Quick lookup for **2s** ($-2$ pts), **Kings** ($0$ pts), **Aces** ($1$ pt), **3 through 10** (face value), **Jacks & Queens** ($10$ pts), vertical column pair cancellations ($0$ pts), and the **100-point outright win** rule.
 - **Match Leaderboard**: Real-time lowest-score-wins ranking and stroke totals.
 
 ### 2. 📝 Round-by-Round / Custom Game Sheets
