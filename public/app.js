@@ -2157,6 +2157,21 @@
       });
     }
 
+    const profileManageSheetsBtn = document.getElementById('btn-profile-manage-sheets');
+    if (profileManageSheetsBtn) {
+      profileManageSheetsBtn.addEventListener('click', () => {
+        renderManageSheetsTable(gamesList);
+        showView('view-manage-sheets');
+      });
+    }
+
+    const profileRulesBtn = document.getElementById('btn-profile-rules');
+    if (profileRulesBtn) {
+      profileRulesBtn.addEventListener('click', () => {
+        showView('view-rules');
+      });
+    }
+
     const manageBackHomeBtn = document.getElementById('btn-manage-back-home');
     if (manageBackHomeBtn) {
       manageBackHomeBtn.addEventListener('click', () => {
@@ -2200,9 +2215,12 @@
       showView('view-home');
     });
 
-    document.getElementById('btn-show-rules').addEventListener('click', () => {
-      showView('view-rules');
-    });
+    const showRulesBtn = document.getElementById('btn-show-rules');
+    if (showRulesBtn) {
+      showRulesBtn.addEventListener('click', () => {
+        showView('view-rules');
+      });
+    }
 
     const heroRulesBtn = document.getElementById('btn-hero-rules');
     if (heroRulesBtn) {
