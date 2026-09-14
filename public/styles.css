@@ -1883,6 +1883,72 @@ body.splash-active {
 }
 
 /* Responsive Tweaks */
+@media (max-width: 860px) {
+  .splash-screen {
+    padding: 24px 14px 40px;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .splash-panel {
+    min-height: auto;
+    border-radius: var(--radius-lg);
+    margin: auto 0;
+  }
+
+  .splash-content {
+    padding: 30px 18px 36px;
+  }
+
+  .splash-kicker {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .splash-content h1 {
+    font-size: clamp(30px, 8.5vw, 44px);
+    line-height: 1.1;
+  }
+
+  .splash-subtitle {
+    font-size: 14.5px;
+    line-height: 1.4;
+    margin: 12px 0 20px;
+  }
+
+  .splash-steps {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .splash-step {
+    min-height: auto;
+    padding: 12px 14px;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .splash-step strong {
+    font-size: 14px;
+    margin-bottom: 2px;
+  }
+
+  .splash-step small {
+    font-size: 12px;
+  }
+
+  .splash-note {
+    position: static;
+    text-align: center;
+    margin: 16px 0 0;
+    display: block;
+  }
+}
+
 @media (max-width: 768px) {
   .hero-title {
     font-size: 1.75rem;
@@ -1913,5 +1979,63 @@ body.splash-active {
   
   .card-slot-center {
     font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 0.6rem 0.8rem;
+  }
+
+  .header-inner {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .brand-text h1 {
+    font-size: 1rem;
+  }
+
+  .brand-text p {
+    display: none;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .header-actions .btn {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.55rem;
+  }
+
+  .container {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  .setup-panel {
+    padding: 1.25rem 1rem;
+  }
+
+  .choice-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .scorecard-header {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .winner-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+  }
+
+  .profile-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.25rem 1rem;
   }
 }
