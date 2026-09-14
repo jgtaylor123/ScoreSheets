@@ -233,44 +233,6 @@
   }
 
   // ==========================================================
-  // HOME SCREEN & CATALOG
-  // ==========================================================
-
-  function renderGameCatalog() {
-    const container = document.getElementById('games-catalog-container');
-    container.innerHTML = Object.values(GAMES_REGISTRY).map(game => `
-      <div class="game-catalog-card ${game.featured ? 'featured' : ''}" data-game-id="${game.id}">
-        <div>
-          <div class="game-catalog-top">
-            <div class="game-catalog-icon">${game.icon}</div>
-            <div>
-              <h4 class="game-catalog-title">${escapeHtml(game.name)}</h4>
-              <span class="game-catalog-badge">${escapeHtml(game.badge)}</span>
-            </div>
-          </div>
-          <p class="game-catalog-desc" style="margin-top: 0.75rem;">${escapeHtml(game.description)}</p>
-        </div>
-        <div class="game-catalog-footer">
-          <span class="game-catalog-meta">${escapeHtml(game.scoreLabel)}</span>
-          <button type="button" class="btn btn-primary btn-sm btn-quick-start" data-game-type="${game.id}">
-            Start Sheet ➔
-          </button>
-        </div>
-      </div>
-    `).join('');
-
-    container.querySelectorAll('.btn-quick-start').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const type = btn.getAttribute('data-game-type');
-        setupSelectedGameType = type;
-        initSetupForm(type);
-        showView('view-setup');
-      });
-    });
-  }
-
-  // ==========================================================
   // GOLF CARD GAME SCORING ENGINE
   // ==========================================================
 
@@ -1912,7 +1874,6 @@
   // Bootstrap
   document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
-    renderGameCatalog();
     initFirebase();
   });
 
