@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Games collection: games can be created and updated by participants
+    match /games/{gameId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['title', 'players', 'holes', 'createdAt']);
+      allow update: if true;
+      allow delete: if request.auth != null && (resource.data.createdBy == request.auth.uid || resource.data.createdBy == 'anonymous');
+    }
+    
+    // User games / profiles collection (when user is authenticated)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      match /savedGames/{gameId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
