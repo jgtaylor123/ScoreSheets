@@ -355,7 +355,7 @@
 
           <!-- Golf Card Game Rules -->
           <div class="rule-card">
-            <h3>⛳ Golf Card Game Rules</h3>
+            <h3>🃏 Golf the Card Game Rules</h3>
             <p>The standard goal is to obtain the <strong>lowest score possible</strong> over the course of 9 or 18 holes (rounds). Lowest total points at the end of the match wins!</p>
             
             <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid var(--border-gold); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin: 0.85rem 0;">
@@ -409,10 +409,145 @@
             </p>
           </div>
 
+          <!-- Golf (Sport / On-Course) Rules -->
+          <div class="rule-card">
+            <h3>⛳ Golf (On-Course Sport)</h3>
+            <p>Traditional on-the-course golf score tracking across 9 or 18 holes.</p>
+            <ul style="margin-left: 1.25rem; margin-top: 0.5rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.875rem;">
+              <li><strong>Stroke Play:</strong> Count total strokes taken across all holes. Lowest cumulative stroke count wins.</li>
+              <li><strong>Match Play:</strong> Hole-by-hole competition (points won per hole).</li>
+              <li><strong>Stableford:</strong> Points awarded relative to par (e.g. Eagle = 4 pts, Birdie = 3 pts, Par = 2 pts, Bogey = 1 pt).</li>
+            </ul>
+          </div>
+
+          <!-- Scrabble Rules -->
+          <div class="rule-card">
+            <h3>🔤 Scrabble Rules &amp; Scoring</h3>
+            <p>Word game where players form interlocking crossword words on a 15×15 grid.</p>
+            <ul style="margin-left: 1.25rem; margin-top: 0.5rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.875rem;">
+              <li><strong>Turn Scoring:</strong> Enter points scored for each placed word, including letter &amp; word multipliers (Double/Triple Letter/Word).</li>
+              <li><strong>Bingo Bonus:</strong> Using all 7 tiles in a single turn awards a <strong>+50 point bonus</strong>!</li>
+              <li><strong>Win Condition:</strong> Highest cumulative score at the end of all turns/game completion wins.</li>
+            </ul>
+          </div>
+
+          <!-- Cribbage Rules -->
+          <div class="rule-card">
+            <h3>🧮 Cribbage Rules &amp; Scoring</h3>
+            <p>Classic 6-card game of counting combinations played to a target score (usually 121 or 61 points).</p>
+            <ul style="margin-left: 1.25rem; margin-top: 0.5rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.875rem;">
+              <li><strong>Fifteens:</strong> Any combination of cards adding up to 15 scores <strong>2 points</strong>.</li>
+              <li><strong>Pairs:</strong> A pair = 2 pts; 3 of a kind (Pair Royale) = 6 pts; 4 of a kind (Double Pair Royale) = 12 pts.</li>
+              <li><strong>Runs / Sequences:</strong> 3 or more consecutive cards score <strong>1 point per card</strong>.</li>
+              <li><strong>Flushes:</strong> 4 cards in hand of same suit = 4 pts (+1 if starter card matches).</li>
+              <li><strong>Nobs (His Nobs):</strong> Jack in hand of starter card's suit = <strong>1 point</strong>.</li>
+              <li><strong>Pegging:</strong> 15 during play = 2 pts, 31 = 2 pts, Go / last card = 1 pt.</li>
+            </ul>
+          </div>
+
+          <!-- Crib (Pub 5-Card) Rules -->
+          <div class="rule-card">
+            <h3>🪙 Crib (5-Card Pub Rules)</h3>
+            <p>Fast-paced traditional 5-card pub variant of Cribbage (race to 61 points).</p>
+            <ul style="margin-left: 1.25rem; margin-top: 0.5rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.875rem;">
+              <li><strong>Hand Size:</strong> Players are dealt 5 cards and discard 1 card into the dealer's crib.</li>
+              <li><strong>Non-Dealer Compensation:</strong> Non-dealer starts with <strong>3 points</strong> (3 holes) pegged before play begins.</li>
+              <li><strong>Flush in 5-Card:</strong> All 3 cards kept in hand must match suit (3 pts), plus 1 pt if cut card matches.</li>
+            </ul>
+          </div>
+
           <!-- Generic ScoreSheet Info -->
           <div class="rule-card">
-            <h3>📝 Round-by-Round / Custom Sheets</h3>
+            <h3>📝 Custom / Round-by-Round Sheets</h3>
             <p>ScoreSheets supports custom point tracking for any turn-based or round-based game. You can configure whether highest or lowest points win, specify custom player counts, and track total scores in real-time.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: USER PROFILE & STATS -->
+      <section id="view-profile" class="view">
+        <div class="setup-panel" style="max-width: 900px;">
+          <div class="profile-header-card">
+            <div class="profile-avatar-large">👤</div>
+            <div class="profile-info-main">
+              <h2 id="profile-display-name">Player Name</h2>
+              <p id="profile-display-email">player@example.com</p>
+              <div class="profile-chips">
+                <span class="meta-pill variant" id="profile-total-games-chip">0 Games Played</span>
+                <span class="meta-pill completed" id="profile-total-wins-chip">0 Wins</span>
+                <span class="meta-pill" id="profile-win-rate-chip">0% Win Rate</span>
+              </div>
+            </div>
+            <div class="profile-header-actions">
+              <button type="button" class="btn btn-danger btn-sm" id="btn-profile-logout">🚪 Log Out</button>
+              <button type="button" class="btn btn-outline btn-sm" id="btn-profile-back">← Back to Home</button>
+            </div>
+          </div>
+
+          <!-- Overall Summary Cards -->
+          <div class="features-grid" style="margin-bottom: 2rem;">
+            <article class="feature-card">
+              <div class="feature-icon">🎮</div>
+              <h3 class="feature-title">Total Games Played</h3>
+              <p class="feature-desc" style="font-size: 1.75rem; font-weight: 900; font-family: var(--font-mono); color: var(--fairway-light);" id="stat-total-games">0</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">🏆</div>
+              <h3 class="feature-title">Total Wins</h3>
+              <p class="feature-desc" style="font-size: 1.75rem; font-weight: 900; font-family: var(--font-mono); color: var(--accent-gold);" id="stat-total-wins">0</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">📈</div>
+              <h3 class="feature-title">Win Percentage</h3>
+              <p class="feature-desc" style="font-size: 1.75rem; font-weight: 900; font-family: var(--font-mono); color: #60a5fa;" id="stat-win-pct">0%</p>
+            </article>
+          </div>
+
+          <!-- Per-Game Performance (Best / Worst / Average Scores) -->
+          <div class="section-header">
+            <h3 class="section-title">📊 Game Score Records</h3>
+          </div>
+          <div class="manage-table-card" style="margin-bottom: 2rem;">
+            <div class="table-responsive">
+              <table class="manage-table" id="profile-game-stats-table">
+                <thead>
+                  <tr>
+                    <th>Game</th>
+                    <th>Played</th>
+                    <th>Wins</th>
+                    <th>Best Score</th>
+                    <th>Average Score</th>
+                    <th>Last Played</th>
+                  </tr>
+                </thead>
+                <tbody id="profile-game-stats-tbody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Head-to-Head Win/Loss Record vs Other Players -->
+          <div class="section-header">
+            <h3 class="section-title">⚔️ Head-to-Head Opponent Records</h3>
+          </div>
+          <div class="manage-table-card">
+            <div class="table-responsive">
+              <table class="manage-table" id="profile-h2h-table">
+                <thead>
+                  <tr>
+                    <th>Opponent</th>
+                    <th>Matches Faced</th>
+                    <th>Wins Against</th>
+                    <th>Losses Against</th>
+                    <th>Win Rate vs Opponent</th>
+                  </tr>
+                </thead>
+                <tbody id="profile-h2h-tbody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -514,7 +649,7 @@
     <script src="/__/firebase/init.js"></script>
 
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=11"></script>
+    <script src="/app.js?v=12"></script>
   </body>
 </html>
 

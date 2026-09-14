@@ -11,17 +11,41 @@
   // ==========================================================
 
   const GAMES_REGISTRY = {
+    real_golf: {
+      id: 'real_golf',
+      name: 'Golf',
+      icon: '⛳',
+      badge: 'Sport / Links',
+      featured: true,
+      scoreType: 'lowest',
+      scoreLabel: 'Lowest Strokes Wins',
+      roundName: 'Hole',
+      roundPlural: 'Holes',
+      description: 'On-the-course golf score tracking. Record strokes per hole across 9 or 18 holes. Lowest total score wins.',
+      variants: [
+        { id: 'stroke', name: 'Stroke Play', desc: 'Total strokes counted', default: true },
+        { id: 'match', name: 'Match Play', desc: 'Hole-by-hole points', default: false },
+        { id: 'stableford', name: 'Stableford', desc: 'Points per hole vs par', default: false }
+      ],
+      roundOptions: [
+        { count: 9, label: '9 Holes', desc: 'Front / Back 9', default: true },
+        { count: 18, label: '18 Holes', desc: 'Full 18 Holes' },
+        { count: 6, label: '6 Holes', desc: 'Short Practice' }
+      ],
+      defaultVariant: 'stroke',
+      defaultRounds: 9
+    },
     golf: {
       id: 'golf',
-      name: 'Golf Card Game',
-      icon: '⛳',
+      name: 'Golf the Card Game',
+      icon: '🃏',
       badge: 'Cards',
       featured: true,
       scoreType: 'lowest', // lowest total score wins (unless someone scores exactly 100!)
       scoreLabel: 'Lowest Score Wins (or 100-pt Shoot the Moon)',
       roundName: 'Hole',
       roundPlural: 'Holes',
-      description: 'Classic 4, 6, 8, or 9-card Golf. Lowest score wins — unless a player hits exactly 100 points for the ultimate win!',
+      description: 'Classic 4, 6, 8, or 9-card Golf card game. 2s are -2, Kings are 0, column pairs cancel to 0. Exactly 100 points wins outright!',
       variants: [
         { id: 4, name: '4-Card Golf', desc: '2x2 Grid (Quick)', default: false },
         { id: 6, name: '6-Card Golf', desc: '2x3 Grid (Classic)', default: true },
@@ -30,23 +54,95 @@
       ],
       roundOptions: [
         { count: 6, label: '6 Holes', desc: 'Short Match' },
-        { count: 9, label: '9 Holes', desc: 'Standard Half', default: true },
-        { count: 18, label: '18 Holes', desc: 'Full Championship' }
+        { count: 9, label: '9 Holes', desc: 'Standard 9 Holes', default: true },
+        { count: 18, label: '18 Holes', desc: 'Full 18 Holes' }
       ],
       defaultVariant: 6,
       defaultRounds: 9
     },
+    scrabble: {
+      id: 'scrabble',
+      name: 'Scrabble',
+      icon: '🔤',
+      badge: 'Word Game',
+      featured: true,
+      scoreType: 'highest',
+      scoreLabel: 'Highest Score Wins',
+      roundName: 'Turn',
+      roundPlural: 'Turns',
+      description: 'Crossword board game scoring. Record word scores per turn with 50-pt bingo bonuses. Highest cumulative score wins!',
+      variants: [
+        { id: 'standard', name: 'Standard Scrabble', desc: 'Word score per turn', default: true },
+        { id: 'tournament', name: 'Tournament Play', desc: 'Strict word challenge rules', default: false }
+      ],
+      roundOptions: [
+        { count: 10, label: '10 Turns', desc: 'Quick Game' },
+        { count: 12, label: '12 Turns', desc: 'Standard Match', default: true },
+        { count: 15, label: '15 Turns', desc: 'Full Board Match' },
+        { count: 20, label: '20 Turns', desc: 'Extended Match' }
+      ],
+      defaultVariant: 'standard',
+      defaultRounds: 12
+    },
+    cribbage: {
+      id: 'cribbage',
+      name: 'Cribbage',
+      icon: '🧮',
+      badge: 'Classic Board & Card',
+      featured: true,
+      scoreType: 'highest',
+      scoreLabel: 'Highest Total (Race to 121 / 61)',
+      roundName: 'Deal',
+      roundPlural: 'Deals',
+      description: 'Traditional 6-card Cribbage. Track hand, crib, and pegging scores across deals on a 121 or 61 point track.',
+      variants: [
+        { id: '121', name: '121 Points', desc: 'Full Board (Standard)', default: true },
+        { id: '61', name: '61 Points', desc: 'Single Track (Short Game)', default: false }
+      ],
+      roundOptions: [
+        { count: 6, label: '6 Deals', desc: 'Short Match' },
+        { count: 8, label: '8 Deals', desc: 'Standard Match', default: true },
+        { count: 10, label: '10 Deals', desc: 'Extended Match' },
+        { count: 12, label: '12 Deals', desc: 'Championship' }
+      ],
+      defaultVariant: '121',
+      defaultRounds: 8
+    },
+    crib: {
+      id: 'crib',
+      name: 'Crib',
+      icon: '🪙',
+      badge: 'Pub / Fast Card',
+      featured: true,
+      scoreType: 'highest',
+      scoreLabel: 'Highest Score Wins',
+      roundName: 'Hand',
+      roundPlural: 'Hands',
+      description: 'Classic 5-card pub Cribbage. Fast-paced hand & crib scoring with rotating dealer.',
+      variants: [
+        { id: '5card', name: '5-Card Crib', desc: 'Traditional pub rules (1 to crib)', default: true },
+        { id: '6card', name: '6-Card Crib', desc: '2 cards discarded to crib', default: false },
+        { id: '3player', name: '3-Player Cutthroat', desc: '1 to crib + 1 from deck', default: false }
+      ],
+      roundOptions: [
+        { count: 5, label: '5 Hands', desc: 'Quick Pub Game' },
+        { count: 7, label: '7 Hands', desc: 'Standard Match', default: true },
+        { count: 10, label: '10 Hands', desc: 'Full Match' }
+      ],
+      defaultVariant: '5card',
+      defaultRounds: 7
+    },
     generic_rounds: {
       id: 'generic_rounds',
-      name: 'Round-by-Round Sheet',
+      name: 'Custom / Round-by-Round',
       icon: '📝',
-      badge: 'Tabletop / Card',
+      badge: 'Tabletop / Dice',
       featured: false,
       scoreType: 'highest', // default, can be toggled via variant
       scoreLabel: 'Highest Score Wins',
       roundName: 'Round',
       roundPlural: 'Rounds',
-      description: 'Universal scorekeeper for any card, board, or dice game with rounds (e.g. Rummy, Farkle, Yahtzee, Wizard, Phase 10).',
+      description: 'Universal scorepad for any card, board, or dice game (Rummy, Yahtzee, Farkle, Phase 10, Wizard).',
       variants: [
         { id: 'highest', name: 'Highest Score Wins', desc: 'Standard point accumulation', default: true },
         { id: 'lowest', name: 'Lowest Score Wins', desc: 'Penalty / trick avoidance', default: false }
@@ -170,8 +266,9 @@
     }
   }
 
-  // Local Storage Fallback
+  // Local Storage Fallbacks & Stats Persistence
   const LOCAL_STORAGE_KEY = 'scoresheets_saved_matches';
+  const STATS_STORAGE_KEY = 'scoresheets_all_match_stats';
 
   function getLocalGames() {
     try {
@@ -188,6 +285,32 @@
     } catch (e) {
       console.error('Error saving to localStorage', e);
     }
+  }
+
+  function getAllStatsMatches() {
+    try {
+      const data = localStorage.getItem(STATS_STORAGE_KEY);
+      const statsList = data ? JSON.parse(data) : [];
+      // Combine with currently active local games
+      const local = getLocalGames();
+      const map = {};
+      statsList.forEach(g => { if (g && g.id) map[g.id] = g; });
+      local.forEach(g => { if (g && g.id) map[g.id] = g; });
+      return Object.values(map);
+    } catch (e) {
+      return getLocalGames();
+    }
+  }
+
+  function recordMatchForStats(game) {
+    try {
+      if (!game || !game.id) return;
+      const statsList = getAllStatsMatches();
+      const map = {};
+      statsList.forEach(g => { if (g && g.id) map[g.id] = g; });
+      map[game.id] = JSON.parse(JSON.stringify(game));
+      localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(Object.values(map)));
+    } catch (e) {}
   }
 
   // ==========================================================
@@ -212,8 +335,8 @@
     const activeSheetsSection = document.getElementById('section-active-sheets');
 
     if (currentUser) {
-      authActionBtn.textContent = '👤 ' + (currentUser.displayName || currentUser.email || 'Sign Out');
-      authActionBtn.title = 'Click to Sign Out';
+      authActionBtn.textContent = '👤 ' + (currentUser.displayName || currentUser.email || 'My Profile');
+      authActionBtn.title = 'View Profile & Stats';
       if (signedOutPane) signedOutPane.style.display = 'none';
       if (signedInPane) signedInPane.style.display = 'block';
       if (authUserName) authUserName.textContent = currentUser.displayName || 'Player';
@@ -230,6 +353,178 @@
       // Hide active score sheets section when not authenticated
       if (activeSheetsSection) activeSheetsSection.classList.add('hidden');
     }
+  }
+
+  // ==========================================================
+  // USER PROFILE & STATS ENGINE
+  // ==========================================================
+
+  function renderProfileView() {
+    const allMatches = getAllStatsMatches();
+    const userDisplayName = (currentUser && (currentUser.displayName || currentUser.email)) || 'Guest Golfer';
+    const userEmail = (currentUser && currentUser.email) || 'Local Player Session';
+
+    document.getElementById('profile-display-name').textContent = userDisplayName;
+    document.getElementById('profile-display-email').textContent = userEmail;
+
+    // Identify user in matches (either matching displayName, email, or primary player #1 in local matches)
+    const normalizedUserNames = [
+      userDisplayName.toLowerCase(),
+      (currentUser && currentUser.displayName ? currentUser.displayName.toLowerCase() : ''),
+      'player 1',
+      'tiger',
+      'me'
+    ].filter(Boolean);
+
+    let totalGamesPlayed = 0;
+    let totalWins = 0;
+
+    // Per-game category stats map
+    // { gameType: { played: 0, wins: 0, scores: [], scoreType: 'lowest'|'highest', lastPlayed: null, gameName: '' } }
+    const gameStatsMap = {};
+
+    // Head-to-Head opponent records map
+    // { opponentName: { faced: 0, wins: 0, losses: 0 } }
+    const h2hMap = {};
+
+    allMatches.forEach(game => {
+      if (!game.players || !Array.isArray(game.players) || game.players.length === 0) return;
+
+      const gType = game.gameType || 'golf';
+      const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+      const scoreType = game.scoreType || gameConfig.scoreType;
+
+      // Find user player entry in this game
+      let userPlayer = game.players.find(p => p.name && normalizedUserNames.includes(p.name.trim().toLowerCase()));
+      if (!userPlayer) {
+        // Default to first player if user created the match
+        userPlayer = game.players[0];
+      }
+
+      const userScoreSum = userPlayer.scores.reduce((acc, s) => (s !== null && s !== undefined ? acc + s : acc), 0);
+      const userPlayedCount = userPlayer.scores.filter(s => s !== null && s !== undefined).length;
+
+      // Only count matches that have recorded scores
+      if (userPlayedCount === 0) return;
+
+      totalGamesPlayed++;
+
+      // Evaluate rank/winner of this match
+      const playerTotals = game.players.map(p => {
+        const sum = p.scores.reduce((acc, s) => (s !== null && s !== undefined ? acc + s : acc), 0);
+        const playedCount = p.scores.filter(s => s !== null && s !== undefined).length;
+        return { name: p.name.trim(), sum, playedCount, isUser: p.id === userPlayer.id || p.name === userPlayer.name };
+      }).filter(p => p.playedCount > 0);
+
+      sortPlayerStats(playerTotals, gType, scoreType);
+      const isWinner = playerTotals.length > 0 && playerTotals[0].isUser;
+      if (isWinner) totalWins++;
+
+      // Update Per-Game Stats
+      if (!gameStatsMap[gType]) {
+        gameStatsMap[gType] = {
+          gameName: gameConfig.name,
+          icon: gameConfig.icon,
+          played: 0,
+          wins: 0,
+          scores: [],
+          scoreType: scoreType,
+          lastPlayed: game.updatedAt || game.createdAt || new Date().toISOString()
+        };
+      }
+      gameStatsMap[gType].played++;
+      if (isWinner) gameStatsMap[gType].wins++;
+      gameStatsMap[gType].scores.push(userScoreSum);
+      if (new Date(game.updatedAt || game.createdAt) > new Date(gameStatsMap[gType].lastPlayed)) {
+        gameStatsMap[gType].lastPlayed = game.updatedAt || game.createdAt;
+      }
+
+      // Update Head-to-Head opponent records
+      const userRank = playerTotals.findIndex(p => p.isUser);
+      playerTotals.forEach((opp, rank) => {
+        if (opp.isUser) return;
+        const oppName = opp.name || 'Opponent';
+        if (!h2hMap[oppName]) {
+          h2hMap[oppName] = { faced: 0, wins: 0, losses: 0 };
+        }
+        h2hMap[oppName].faced++;
+        if (userRank !== -1) {
+          if (userRank < rank) {
+            h2hMap[oppName].wins++;
+          } else if (userRank > rank) {
+            h2hMap[oppName].losses++;
+          }
+        }
+      });
+    });
+
+    const winPercentage = totalGamesPlayed > 0 ? Math.round((totalWins / totalGamesPlayed) * 100) : 0;
+
+    // Header & Summary Stats
+    document.getElementById('profile-total-games-chip').textContent = `${totalGamesPlayed} Matches Played`;
+    document.getElementById('profile-total-wins-chip').textContent = `${totalWins} Wins`;
+    document.getElementById('profile-win-rate-chip').textContent = `${winPercentage}% Win Rate`;
+
+    document.getElementById('stat-total-games').textContent = totalGamesPlayed;
+    document.getElementById('stat-total-wins').textContent = totalWins;
+    document.getElementById('stat-win-pct').textContent = `${winPercentage}%`;
+
+    // 1. Render Game Score Records Table
+    const gameStatsTbody = document.getElementById('profile-game-stats-tbody');
+    const gameStatEntries = Object.values(gameStatsMap);
+
+    if (gameStatEntries.length === 0) {
+      gameStatsTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No completed match records yet. Play matches to build your stats!</td></tr>`;
+    } else {
+      gameStatsTbody.innerHTML = gameStatEntries.map(g => {
+        const isLowest = g.scoreType === 'lowest';
+        const bestScore = isLowest ? Math.min(...g.scores) : Math.max(...g.scores);
+        const avgScore = Math.round((g.scores.reduce((a, b) => a + b, 0) / g.scores.length) * 10) / 10;
+        const lastDate = new Date(g.lastPlayed).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const winRate = g.played > 0 ? Math.round((g.wins / g.played) * 100) : 0;
+
+        return `
+          <tr>
+            <td><strong>${g.icon} ${escapeHtml(g.gameName)}</strong></td>
+            <td>${g.played}</td>
+            <td><strong style="color: var(--accent-gold);">${g.wins}</strong> (${winRate}%)</td>
+            <td><strong style="color: var(--fairway-light);">${bestScore}</strong> <small style="color: var(--text-muted);">(${isLowest ? 'Lowest' : 'Highest'})</small></td>
+            <td>${avgScore}</td>
+            <td style="color: var(--text-muted);">${lastDate}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 2. Render Head-to-Head Table
+    const h2hTbody = document.getElementById('profile-h2h-tbody');
+    const h2hEntries = Object.entries(h2hMap);
+
+    if (h2hEntries.length === 0) {
+      h2hTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No multiplayer match records found yet.</td></tr>`;
+    } else {
+      h2hEntries.sort((a, b) => b[1].faced - a[1].faced);
+      h2hTbody.innerHTML = h2hEntries.map(([oppName, stats]) => {
+        const rate = stats.faced > 0 ? Math.round((stats.wins / stats.faced) * 100) : 0;
+        const rateColor = rate >= 50 ? 'var(--fairway-light)' : '#fca5a5';
+
+        return `
+          <tr>
+            <td><strong>👤 ${escapeHtml(oppName)}</strong></td>
+            <td>${stats.faced}</td>
+            <td style="color: var(--fairway-light); font-weight: 700;">${stats.wins}</td>
+            <td style="color: #fca5a5; font-weight: 700;">${stats.losses}</td>
+            <td>
+              <span class="meta-pill" style="color: ${rateColor}; background: rgba(255, 255, 255, 0.06); font-weight: 800;">
+                ${rate}% Win Rate
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    showView('view-profile');
   }
 
   // ==========================================================
@@ -747,7 +1042,13 @@
   }
 
   async function deleteGame(gameId) {
-    if (!confirm('Are you sure you want to delete this scorecard?')) return;
+    if (!confirm('Remove this match card from your history? (Scores will still count toward your lifetime stats)')) return;
+
+    // Find and preserve game data in permanent stats storage before deleting from active list
+    const targetGame = getLocalGames().find(g => g.id === gameId) || gamesList.find(g => g.id === gameId);
+    if (targetGame) {
+      recordMatchForStats(targetGame);
+    }
 
     let localGames = getLocalGames().filter(g => g.id !== gameId);
     saveLocalGames(localGames);
@@ -763,7 +1064,7 @@
       }
     }
 
-    showToast('Match deleted', 'success');
+    showToast('Match removed from history (stats preserved)', 'info');
     loadGamesList();
     showView('view-home');
   }
@@ -1282,6 +1583,9 @@
 
   // Quick Score Presets
   const GOLF_QUICK_SCORES = [-20, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  const REAL_GOLF_QUICK_SCORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const SCRABBLE_QUICK_SCORES = [0, 5, 8, 10, 12, 14, 16, 18, 20, 24, 28, 30, 35, 40, 50, 60, 70, 80];
+  const CRIBBAGE_QUICK_SCORES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 24, 28, 29];
   const GENERIC_QUICK_SCORES = [-10, -5, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 50, 100];
 
   // ==========================================================
@@ -1410,7 +1714,16 @@
     const container = document.getElementById('modal-numpad-container');
     if (!container) return;
 
-    const scoresList = gameType === 'golf' ? GOLF_QUICK_SCORES : GENERIC_QUICK_SCORES;
+    let scoresList = GENERIC_QUICK_SCORES;
+    if (gameType === 'golf') {
+      scoresList = GOLF_QUICK_SCORES;
+    } else if (gameType === 'real_golf') {
+      scoresList = REAL_GOLF_QUICK_SCORES;
+    } else if (gameType === 'scrabble') {
+      scoresList = SCRABBLE_QUICK_SCORES;
+    } else if (gameType === 'cribbage' || gameType === 'crib') {
+      scoresList = CRIBBAGE_QUICK_SCORES;
+    }
 
     let html = scoresList.map(num => {
       const isJackpot = num === -20;
@@ -1850,20 +2163,41 @@
       });
     }
 
-    // Auth Modal Actions
+    // Auth & Profile Navigation Action
     const authModal = document.getElementById('modal-auth');
     document.getElementById('btn-auth-action').addEventListener('click', () => {
-      if (currentUser && auth) {
-        if (confirm('Do you want to sign out?')) {
-          auth.signOut().then(() => {
-            showToast('Signed out', 'info');
-            showSplashScreen();
-          });
-        }
+      if (currentUser) {
+        // Open dedicated Profile & Stats Page
+        renderProfileView();
       } else {
         openSignInModal();
       }
     });
+
+    // Profile Page Back & Log Out actions
+    const profileBackBtn = document.getElementById('btn-profile-back');
+    if (profileBackBtn) {
+      profileBackBtn.addEventListener('click', () => {
+        loadGamesList();
+        showView('view-home');
+      });
+    }
+
+    const profileLogoutBtn = document.getElementById('btn-profile-logout');
+    if (profileLogoutBtn) {
+      profileLogoutBtn.addEventListener('click', async () => {
+        if (confirm('Are you sure you want to log out?')) {
+          if (auth) {
+            await auth.signOut();
+          }
+          currentUser = null;
+          updateAuthUI();
+          showToast('Signed out successfully', 'info');
+          showSplashScreen();
+          showView('view-home');
+        }
+      });
+    }
 
     document.getElementById('btn-close-auth-modal').addEventListener('click', () => {
       authModal.classList.remove('is-open');
