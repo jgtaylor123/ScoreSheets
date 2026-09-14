@@ -293,50 +293,59 @@
   // FIREBASE INITIALIZATION & SYNC
   // ==========================================================
 
-  const DEFAULT_FIREBASE_CONFIG = {
-    projectId: "gamescoresheets",
-    appId: "1:1083019961507:web:c33f49d8a1a3b675a88b16",
-    storageBucket: "gamescoresheets.firebasestorage.app",
-    apiKey: "AIzaSyBydI_r0DxTvzaRM3rapYirqczF9EDGavc",
-    authDomain: "gamescoresheets.firebaseapp.com",
-    messagingSenderId: "1083019961507",
-    measurementId: "G-3GFEX8MT3C"
-  };
-
   function initFirebase() {
     try {
       if (window.firebase) {
         if (!firebase.apps.length) {
-          const config = window.firebaseConfig || DEFAULT_FIREBASE_CONFIG;
-          firebase.initializeApp(config);
+          if (window.firebaseConfig) {
+            firebase.initializeApp(window.firebaseConfig);
+          } else {
+            // Hosting-provided init script automatically configures default app
+            try {
+              firebase.app();
+            } catch (e) {}
+          }
         }
 
-        auth = firebase.auth();
-        db = firebase.firestore();
-
-        // Configure session persistence
         try {
-          const isMobile = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || '');
-          const persistence = isMobile ? firebase.auth.Auth.Persistence.SESSION : firebase.auth.Auth.Persistence.LOCAL;
-          auth.setPersistence(persistence).catch(() => {});
-        } catch (e) {}
+          auth = firebase.auth();
+          db = firebase.firestore();
+        } catch (e) {
+          console.warn('Firebase services not ready:', e);
+        }
+
+        if (auth) {
+          // Configure session persistence
+          try {
+            const isMobile = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || '');
+            const persistence = isMobile ? firebase.auth.Auth.Persistence.SESSION : firebase.auth.Auth.Persistence.LOCAL;
+            auth.setPersistence(persistence).catch(() => {});
+          } catch (e) {}
+
+          auth.onAuthStateChanged(user => {
+            currentUser = user;
+            updateAuthUI();
+            if (currentUser) {
+              closeSignInModal();
+              dismissSplashScreen();
+            }
+            loadGamesList();
+          });
+        }
 
         // Enable offline persistence in Firestore SDK for robust offline operation
-        try {
-          db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-            console.warn('Firestore offline persistence note:', err && err.code);
-          });
-        } catch (e) {}
+        if (db) {
+          try {
+            db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+              console.warn('Firestore offline persistence note:', err && err.code);
+            });
+          } catch (e) {}
+        }
 
-        auth.onAuthStateChanged(user => {
-          currentUser = user;
+        if (!auth) {
           updateAuthUI();
-          if (currentUser) {
-            closeSignInModal();
-            dismissSplashScreen();
-          }
           loadGamesList();
-        });
+        }
       } else {
         console.warn('ScoreSheets initialized in local offline mode.');
         updateAuthUI();
