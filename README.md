@@ -7,10 +7,10 @@ A modern, real-time multiplayer digital scorekeeper and match tracker for tablet
 ## 🌟 Available ScoreSheets & Games
 
 ### 1. ⛳ Golf Card Game
-- **Interactive Card Layout Calculator**: Supports 4-card ($2 \times 2$), 6-card ($2 \times 3$), 8-card ($2 \times 4$), and 9-card ($3 \times 3$) variations.
-- **Smart Column Pair Rules**: Automatically cancels matching vertical card pairs to $0$ points.
-- **Special Card Values**: Automatically scores Jokers ($-2$ pts), Kings ($0$ pts), Aces ($1$ pt), and Face cards ($10$ pts).
-- **Match Formats**: 6-hole, 9-hole, and 18-hole matches with lowest-score-wins leaderboard.
+- **Fast Hole Score Reporting**: Quick points pad, increment/decrement steppers, and direct numeric input.
+- **Game Formats**: 4-card, 6-card, 8-card, and 9-card Golf across 6, 9, or 18 holes.
+- **Built-In Rules Reference**: Quick lookup for Jokers ($-2$ pts), Kings ($0$ pts), Aces ($1$ pt), Face cards ($10$ pts), and vertical column pair cancellations ($0$ pts).
+- **Match Leaderboard**: Real-time lowest-score-wins ranking and stroke totals.
 
 ### 2. 📝 Round-by-Round / Custom Game Sheets
 - **Universal Round Tracker**: Flexible scorepad for games like Rummy, Farkle, Yahtzee, Wizard, Phase 10, Hearts, Spades, etc.

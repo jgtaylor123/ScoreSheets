@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#062e1c" />
-    <meta name="description" content="ScoreSheets - Universal digital scorekeeper, interactive card calculator, and match tracker for card, board, and tabletop games." />
-    <title>ScoreSheets | Digital Scorekeeper & Card Tracker</title>
+    <meta name="description" content="ScoreSheets - Universal digital scorekeeper and match tracker for card, board, and tabletop games." />
+    <title>ScoreSheets | Digital Scorekeeper</title>
     
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
@@ -322,7 +322,7 @@
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 0.75rem;">
           <p style="font-size: 0.85rem; color: var(--text-muted);" id="scorecard-hint-text">
-            💡 Tap any cell to enter round score or launch interactive calculators.
+            💡 Tap any cell to record points for that round or hole.
           </p>
           <button type="button" class="btn btn-outline btn-sm" id="btn-finish-game-toggle">
             🏁 Toggle Match Completion
@@ -397,76 +397,52 @@
 
     </main>
 
-    <!-- MODAL: SCORE ENTRY & CALCULATOR -->
+    <!-- MODAL: SCORE ENTRY -->
     <div id="modal-score-input" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-score-title">
-      <div class="modal-dialog">
+      <div class="modal-dialog" style="max-width: 480px;">
         <div class="modal-header">
-          <h3 id="modal-score-title">Score Round</h3>
+          <h3 id="modal-score-title">Record Score</h3>
           <button type="button" class="btn btn-outline btn-sm btn-icon" id="btn-close-score-modal" aria-label="Close">✕</button>
         </div>
 
         <div class="modal-body">
-          <div class="tabs-header" id="score-modal-tabs">
-            <button type="button" class="tab-btn is-active" id="tab-btn-calculator" data-tab="tab-calculator">🎴 Card Layout Calculator</button>
-            <button type="button" class="tab-btn" id="tab-btn-numpad" data-tab="tab-numpad">🔢 Quick Score Entry</button>
-          </div>
-
-          <!-- TAB 1: CARD CALCULATOR (For Golf Game) -->
-          <div id="tab-calculator" class="tab-pane is-active">
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-              Select each slot below and tap a card rank to automatically calculate column pair cancellations.
-            </p>
-
-            <div class="score-display-huge">
-              <div class="label">Calculated Score</div>
-              <div class="value" id="calc-total-score">0</div>
-            </div>
-
-            <!-- Dynamic Card Slots Grid -->
-            <div id="calc-card-grid" class="card-grid-selector card-grid-6">
-              <!-- Rendered via JS -->
-            </div>
-
-            <!-- Card Palette -->
-            <div class="card-palette-section">
-              <div class="card-palette-title">Choose Card for Selected Slot:</div>
-              <div class="card-palette" id="calc-card-palette">
-                <!-- Rendered via JS -->
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB 2: DIRECT NUMPAD -->
-          <div id="tab-numpad" class="tab-pane">
-            <div class="score-display-huge">
-              <div class="label">Round Points</div>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1.25rem;">
+            <button type="button" class="btn btn-outline" id="btn-score-dec" style="width: 48px; height: 48px; font-size: 1.5rem; font-weight: 800; border-radius: 50%;">–</button>
+            <div class="score-display-huge" style="margin-bottom: 0; min-width: 140px;">
+              <div class="label" id="score-display-label">Score</div>
               <div class="value" id="direct-score-display">0</div>
             </div>
+            <button type="button" class="btn btn-outline" id="btn-score-inc" style="width: 48px; height: 48px; font-size: 1.5rem; font-weight: 800; border-radius: 50%;">+</button>
+          </div>
 
-            <div class="numpad-grid">
-              <button type="button" class="numpad-btn" data-val="-2">-2</button>
-              <button type="button" class="numpad-btn" data-val="0">0</button>
-              <button type="button" class="numpad-btn" data-val="1">1</button>
-              <button type="button" class="numpad-btn" data-val="2">2</button>
-              <button type="button" class="numpad-btn" data-val="3">3</button>
-              <button type="button" class="numpad-btn" data-val="4">4</button>
-              <button type="button" class="numpad-btn" data-val="5">5</button>
-              <button type="button" class="numpad-btn" data-val="6">6</button>
-              <button type="button" class="numpad-btn" data-val="7">7</button>
-              <button type="button" class="numpad-btn" data-val="8">8</button>
-              <button type="button" class="numpad-btn" data-val="9">9</button>
-              <button type="button" class="numpad-btn" data-val="10">10</button>
-              <button type="button" class="numpad-btn" data-val="15">15</button>
-              <button type="button" class="numpad-btn" data-val="20">20</button>
-              <button type="button" class="numpad-btn" data-val="25">25</button>
-              <button type="button" class="numpad-btn" data-val="CLR">CLR</button>
-            </div>
+          <p style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin-bottom: 0.5rem; text-align: center;">Quick Points Selection</p>
+          <div class="numpad-grid" style="grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-top: 0.25rem;">
+            <button type="button" class="numpad-btn" data-val="-2">-2</button>
+            <button type="button" class="numpad-btn" data-val="-1">-1</button>
+            <button type="button" class="numpad-btn" data-val="0">0</button>
+            <button type="button" class="numpad-btn" data-val="1">1</button>
+            <button type="button" class="numpad-btn" data-val="2">2</button>
+            <button type="button" class="numpad-btn" data-val="3">3</button>
+            <button type="button" class="numpad-btn" data-val="4">4</button>
+            <button type="button" class="numpad-btn" data-val="5">5</button>
+            <button type="button" class="numpad-btn" data-val="6">6</button>
+            <button type="button" class="numpad-btn" data-val="7">7</button>
+            <button type="button" class="numpad-btn" data-val="8">8</button>
+            <button type="button" class="numpad-btn" data-val="9">9</button>
+            <button type="button" class="numpad-btn" data-val="10">10</button>
+            <button type="button" class="numpad-btn" data-val="12">12</button>
+            <button type="button" class="numpad-btn" data-val="14">14</button>
+            <button type="button" class="numpad-btn" data-val="16">16</button>
+            <button type="button" class="numpad-btn" data-val="18">18</button>
+            <button type="button" class="numpad-btn" data-val="20">20</button>
+            <button type="button" class="numpad-btn" data-val="25">25</button>
+            <button type="button" class="numpad-btn" data-val="0" style="color: var(--danger); font-size: 0.95rem;">CLR</button>
+          </div>
 
-            <!-- Manual Custom Input Field for Arbitrary Numbers -->
-            <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
-              <input type="number" id="input-direct-custom" class="form-input" placeholder="Or enter custom points (+/-)" />
-              <button type="button" class="btn btn-outline btn-sm" id="btn-apply-custom-direct">Apply</button>
-            </div>
+          <!-- Direct Custom Number Input -->
+          <div style="margin-top: 1.25rem; display: flex; gap: 0.5rem; align-items: center;">
+            <input type="number" id="input-direct-custom" class="form-input" placeholder="Or enter exact points..." />
+            <button type="button" class="btn btn-outline btn-sm" id="btn-apply-custom-direct">Set</button>
           </div>
         </div>
 
@@ -535,7 +511,7 @@
     <script src="/__/firebase/init.js"></script>
 
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=3"></script>
+    <script src="/app.js?v=4"></script>
   </body>
 </html>
 

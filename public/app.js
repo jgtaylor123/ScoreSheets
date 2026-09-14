@@ -21,7 +21,7 @@
       scoreLabel: 'Lowest Score Wins',
       roundName: 'Hole',
       roundPlural: 'Holes',
-      description: 'Classic 4, 6, 8, or 9-card Golf. Layout pairs in columns cancel to 0 pts, Jokers are -2 pts, Kings are 0 pts.',
+      description: 'Classic 4, 6, 8, or 9-card Golf. Lowest total points at the end of the match wins.',
       variants: [
         { id: 4, name: '4-Card Golf', desc: '2x2 Grid (Quick)', default: false },
         { id: 6, name: '6-Card Golf', desc: '2x3 Grid (Classic)', default: true },
@@ -34,8 +34,7 @@
         { count: 18, label: '18 Holes', desc: 'Full Championship' }
       ],
       defaultVariant: 6,
-      defaultRounds: 9,
-      hasCardCalculator: true
+      defaultRounds: 9
     },
     generic_rounds: {
       id: 'generic_rounds',
@@ -59,31 +58,9 @@
         { count: 12, label: '12 Rounds', desc: 'Championship' }
       ],
       defaultVariant: 'highest',
-      defaultRounds: 7,
-      hasCardCalculator: false
+      defaultRounds: 7
     }
   };
-
-  // --- Golf Card Constants & Values ---
-  const GOLF_CARD_RANKS = [
-    { rank: 'JOKER', label: '★', pts: -2, name: 'Joker', color: 'gold' },
-    { rank: 'K', label: 'K', pts: 0, name: 'King', color: 'green' },
-    { rank: 'A', label: 'A', pts: 1, name: 'Ace' },
-    { rank: '2', label: '2', pts: 2, name: '2' },
-    { rank: '3', label: '3', pts: 3, name: '3' },
-    { rank: '4', label: '4', pts: 4, name: '4' },
-    { rank: '5', label: '5', pts: 5, name: '5' },
-    { rank: '6', label: '6', pts: 6, name: '6' },
-    { rank: '7', label: '7', pts: 7, name: '7' },
-    { rank: '8', label: '8', pts: 8, name: '8' },
-    { rank: '9', label: '9', pts: 9, name: '9' },
-    { rank: '10', label: '10', pts: 10, name: '10' },
-    { rank: 'J', label: 'J', pts: 10, name: 'Jack', color: 'red' },
-    { rank: 'Q', label: 'Q', pts: 10, name: 'Queen', color: 'red' }
-  ];
-
-  const GOLF_CARD_MAP = {};
-  GOLF_CARD_RANKS.forEach(c => { GOLF_CARD_MAP[c.rank] = c; });
 
   // App State
   let currentUser = null;
@@ -101,9 +78,6 @@
   let editingScoreCtx = {
     playerId: null,
     holeIdx: null,
-    variant: 6,
-    slots: [],
-    activeSlotIdx: 0,
     directScore: 0
   };
 
@@ -270,9 +244,9 @@
           <p class="game-catalog-desc" style="margin-top: 0.75rem;">${escapeHtml(game.description)}</p>
         </div>
         <div class="game-catalog-footer">
-          <span class="game-catalog-meta">${game.hasCardCalculator ? '🎴 Card Calculator' : '🔢 Custom Scoring'}</span>
+          <span class="game-catalog-meta">${escapeHtml(game.scoreLabel)}</span>
           <button type="button" class="btn btn-primary btn-sm btn-quick-start" data-game-type="${game.id}">
-            Play Now ➔
+            Start Sheet ➔
           </button>
         </div>
       </div>
@@ -1000,7 +974,7 @@
   }
 
   // ==========================================================
-  // SCORE INPUT & CALCULATOR MODAL
+  // SCORE INPUT MODAL (DIRECT REPORTING)
   // ==========================================================
 
   function openScoreModal(playerId, holeIdx) {
@@ -1012,33 +986,11 @@
 
     editingScoreCtx.playerId = playerId;
     editingScoreCtx.holeIdx = holeIdx;
-    editingScoreCtx.variant = typeof activeGame.variant === 'number' ? activeGame.variant : 6;
-    editingScoreCtx.activeSlotIdx = 0;
 
-    document.getElementById('modal-score-title').textContent = `${gameConfig.roundName} ${holeIdx + 1} Score - ${player.name}`;
-
-    // Handle Card Calculator visibility
-    const calcTabBtn = document.getElementById('tab-btn-calculator');
-
-    if (gameConfig.hasCardCalculator) {
-      calcTabBtn.style.display = 'inline-block';
-      const existingCards = player.cardDetails && player.cardDetails[holeIdx];
-      if (existingCards && Array.isArray(existingCards) && existingCards.length === editingScoreCtx.variant) {
-        editingScoreCtx.slots = [...existingCards];
-      } else {
-        editingScoreCtx.slots = Array(editingScoreCtx.variant).fill('K');
-      }
-      renderCardSlotsGrid();
-      renderCardPalette();
-      updateModalCalculatedScore();
-      switchModalTab('tab-calculator');
-    } else {
-      calcTabBtn.style.display = 'none';
-      switchModalTab('tab-numpad');
-    }
+    document.getElementById('modal-score-title').textContent = `${gameConfig.roundName} ${holeIdx + 1} Score – ${player.name}`;
 
     const existingScore = player.scores[holeIdx];
-    editingScoreCtx.directScore = existingScore !== null ? existingScore : 0;
+    editingScoreCtx.directScore = existingScore !== null && existingScore !== undefined ? existingScore : 0;
     document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
     document.getElementById('input-direct-custom').value = '';
 
@@ -1050,101 +1002,17 @@
     document.getElementById('modal-score-input').classList.remove('is-open');
   }
 
-  function renderCardSlotsGrid() {
-    const grid = document.getElementById('calc-card-grid');
-    grid.className = `card-grid-selector card-grid-${editingScoreCtx.variant}`;
-    grid.innerHTML = '';
-
-    const { pairedSlotIndices } = calculateGolfCardsScore(editingScoreCtx.variant, editingScoreCtx.slots);
-
-    editingScoreCtx.slots.forEach((rank, idx) => {
-      const cardInfo = GOLF_CARD_MAP[rank] || GOLF_CARD_MAP['K'];
-      const isSelected = idx === editingScoreCtx.activeSlotIdx;
-      const isPaired = pairedSlotIndices.has(idx);
-      const isRed = cardInfo.color === 'red';
-
-      const slotDiv = document.createElement('div');
-      slotDiv.className = `card-slot ${isSelected ? 'is-active-slot' : ''} ${isPaired ? 'is-paired' : ''} ${isRed ? 'is-red' : ''}`;
-      slotDiv.innerHTML = `
-        <div class="card-slot-rank">${escapeHtml(cardInfo.label)}</div>
-        <div class="card-slot-center">${cardInfo.rank === 'JOKER' ? '🃏' : cardInfo.label}</div>
-        <div class="card-slot-points">${isPaired ? '0 pts' : cardInfo.pts + ' pts'}</div>
-      `;
-
-      slotDiv.addEventListener('click', () => {
-        editingScoreCtx.activeSlotIdx = idx;
-        renderCardSlotsGrid();
-      });
-
-      grid.appendChild(slotDiv);
-    });
-  }
-
-  function renderCardPalette() {
-    const palette = document.getElementById('calc-card-palette');
-    palette.innerHTML = '';
-
-    GOLF_CARD_RANKS.forEach(card => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `card-pick-btn ${card.color === 'red' ? 'red-card' : ''}`;
-      btn.innerHTML = `
-        <span>${escapeHtml(card.label)}</span>
-        <span class="pick-pts">${card.pts}p</span>
-      `;
-
-      btn.addEventListener('click', () => {
-        editingScoreCtx.slots[editingScoreCtx.activeSlotIdx] = card.rank;
-        if (editingScoreCtx.activeSlotIdx < editingScoreCtx.variant - 1) {
-          editingScoreCtx.activeSlotIdx++;
-        }
-        renderCardSlotsGrid();
-        updateModalCalculatedScore();
-      });
-
-      palette.appendChild(btn);
-    });
-  }
-
-  function updateModalCalculatedScore() {
-    const { total } = calculateGolfCardsScore(editingScoreCtx.variant, editingScoreCtx.slots);
-    document.getElementById('calc-total-score').textContent = total;
-  }
-
-  function switchModalTab(tabId) {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.classList.toggle('is-active', btn.getAttribute('data-tab') === tabId);
-    });
-    document.querySelectorAll('.tab-pane').forEach(pane => {
-      pane.classList.toggle('is-active', pane.id === tabId);
-    });
-  }
-
   async function saveScoreFromModal() {
-    const activeTab = document.querySelector('.tab-pane.is-active');
-    let finalScore = 0;
-    let cardDetails = null;
-
-    const gType = activeGame.gameType || 'golf';
-    const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
-
-    if (activeTab.id === 'tab-calculator' && gameConfig.hasCardCalculator) {
-      const { total } = calculateGolfCardsScore(editingScoreCtx.variant, editingScoreCtx.slots);
-      finalScore = total;
-      cardDetails = [...editingScoreCtx.slots];
-    } else {
-      finalScore = editingScoreCtx.directScore;
-      cardDetails = null;
-    }
-
     const player = activeGame.players.find(p => p.id === editingScoreCtx.playerId);
     if (player) {
-      player.scores[editingScoreCtx.holeIdx] = finalScore;
-      player.cardDetails[editingScoreCtx.holeIdx] = cardDetails;
+      const gType = activeGame.gameType || 'golf';
+      const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+
+      player.scores[editingScoreCtx.holeIdx] = editingScoreCtx.directScore;
       await saveGame(activeGame);
       renderScorecard();
       closeScoreModal();
-      showToast(`${gameConfig.roundName} ${editingScoreCtx.holeIdx + 1} score saved for ${player.name}`, 'success');
+      showToast(`${gameConfig.roundName} ${editingScoreCtx.holeIdx + 1} score (${editingScoreCtx.directScore} pts) saved for ${player.name}`, 'success');
     }
   }
 
@@ -1152,7 +1020,6 @@
     const player = activeGame.players.find(p => p.id === editingScoreCtx.playerId);
     if (player) {
       player.scores[editingScoreCtx.holeIdx] = null;
-      player.cardDetails[editingScoreCtx.holeIdx] = null;
       await saveGame(activeGame);
       renderScorecard();
       closeScoreModal();
@@ -1422,19 +1289,30 @@
       showToast(activeGame.completed ? 'Match marked as completed! 🏆' : 'Match in progress', 'success');
     });
 
-    // Score Modal Tabs & Actions
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        switchModalTab(btn.getAttribute('data-tab'));
-      });
-    });
-
+    // Score Modal Actions
     document.getElementById('btn-close-score-modal').addEventListener('click', closeScoreModal);
     document.getElementById('btn-cancel-score-modal').addEventListener('click', closeScoreModal);
     document.getElementById('btn-save-score').addEventListener('click', saveScoreFromModal);
     document.getElementById('btn-clear-score').addEventListener('click', clearScoreFromModal);
 
-    // Direct Numpad Buttons
+    // Quick Decrement / Increment Stepper Buttons (- / +)
+    const btnScoreDec = document.getElementById('btn-score-dec');
+    if (btnScoreDec) {
+      btnScoreDec.addEventListener('click', () => {
+        editingScoreCtx.directScore -= 1;
+        document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
+      });
+    }
+
+    const btnScoreInc = document.getElementById('btn-score-inc');
+    if (btnScoreInc) {
+      btnScoreInc.addEventListener('click', () => {
+        editingScoreCtx.directScore += 1;
+        document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
+      });
+    }
+
+    // Direct Quick Point Buttons
     document.querySelectorAll('.numpad-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const val = btn.getAttribute('data-val');
@@ -1448,13 +1326,18 @@
     });
 
     // Custom Direct Points Field
-    document.getElementById('btn-apply-custom-direct').addEventListener('click', () => {
-      const val = parseInt(document.getElementById('input-direct-custom').value, 10);
-      if (!isNaN(val)) {
-        editingScoreCtx.directScore = val;
-        document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
-      }
-    });
+    const applyCustomBtn = document.getElementById('btn-apply-custom-direct');
+    if (applyCustomBtn) {
+      applyCustomBtn.addEventListener('click', () => {
+        const input = document.getElementById('input-direct-custom');
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val)) {
+          editingScoreCtx.directScore = val;
+          document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
+          input.value = '';
+        }
+      });
+    }
 
     // Auth Modal Actions
     const authModal = document.getElementById('modal-auth');
