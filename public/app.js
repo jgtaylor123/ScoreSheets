@@ -1,13 +1,71 @@
 /**
- * Golf Card Game Scorekeeper - Core Application
- * Handles State, Score Calculations, Pairing Logic, UI Rendering, and Firebase Firestore Sync
+ * ScoreSheets - Universal Digital Scorekeeper & Match Tracker
+ * Supports Golf Card Game, Generic Round-by-Round Sheets, and easily extensible game modules.
  */
 
 (function () {
   'use strict';
 
-  // --- Card Definition Constants & Scoring Rules ---
-  const CARD_RANKS = [
+  // ==========================================================
+  // GAMES REGISTRY & CONFIGURATIONS
+  // ==========================================================
+
+  const GAMES_REGISTRY = {
+    golf: {
+      id: 'golf',
+      name: 'Golf Card Game',
+      icon: '⛳',
+      badge: 'Cards',
+      featured: true,
+      scoreType: 'lowest', // lowest total score wins
+      scoreLabel: 'Lowest Score Wins',
+      roundName: 'Hole',
+      roundPlural: 'Holes',
+      description: 'Classic 4, 6, 8, or 9-card Golf. Layout pairs in columns cancel to 0 pts, Jokers are -2 pts, Kings are 0 pts.',
+      variants: [
+        { id: 4, name: '4-Card Golf', desc: '2x2 Grid (Quick)', default: false },
+        { id: 6, name: '6-Card Golf', desc: '2x3 Grid (Classic)', default: true },
+        { id: 8, name: '8-Card Golf', desc: '2x4 Grid', default: false },
+        { id: 9, name: '9-Card Golf', desc: '3x3 Grid', default: false }
+      ],
+      roundOptions: [
+        { count: 6, label: '6 Holes', desc: 'Short Match' },
+        { count: 9, label: '9 Holes', desc: 'Standard Half', default: true },
+        { count: 18, label: '18 Holes', desc: 'Full Championship' }
+      ],
+      defaultVariant: 6,
+      defaultRounds: 9,
+      hasCardCalculator: true
+    },
+    generic_rounds: {
+      id: 'generic_rounds',
+      name: 'Round-by-Round Sheet',
+      icon: '📝',
+      badge: 'Tabletop / Card',
+      featured: false,
+      scoreType: 'highest', // default, can be toggled via variant
+      scoreLabel: 'Highest Score Wins',
+      roundName: 'Round',
+      roundPlural: 'Rounds',
+      description: 'Universal scorekeeper for any card, board, or dice game with rounds (e.g. Rummy, Farkle, Yahtzee, Wizard, Phase 10).',
+      variants: [
+        { id: 'highest', name: 'Highest Score Wins', desc: 'Standard point accumulation', default: true },
+        { id: 'lowest', name: 'Lowest Score Wins', desc: 'Penalty / trick avoidance', default: false }
+      ],
+      roundOptions: [
+        { count: 5, label: '5 Rounds', desc: 'Quick Game' },
+        { count: 7, label: '7 Rounds', desc: 'Standard', default: true },
+        { count: 10, label: '10 Rounds', desc: 'Extended Match' },
+        { count: 12, label: '12 Rounds', desc: 'Championship' }
+      ],
+      defaultVariant: 'highest',
+      defaultRounds: 7,
+      hasCardCalculator: false
+    }
+  };
+
+  // --- Golf Card Constants & Values ---
+  const GOLF_CARD_RANKS = [
     { rank: 'JOKER', label: '★', pts: -2, name: 'Joker', color: 'gold' },
     { rank: 'K', label: 'K', pts: 0, name: 'King', color: 'green' },
     { rank: 'A', label: 'A', pts: 1, name: 'Ace' },
@@ -24,8 +82,8 @@
     { rank: 'Q', label: 'Q', pts: 10, name: 'Queen', color: 'red' }
   ];
 
-  const CARD_MAP = {};
-  CARD_RANKS.forEach(c => { CARD_MAP[c.rank] = c; });
+  const GOLF_CARD_MAP = {};
+  GOLF_CARD_RANKS.forEach(c => { GOLF_CARD_MAP[c.rank] = c; });
 
   // App State
   let currentUser = null;
@@ -35,23 +93,26 @@
   let auth = null;
   let firestoreUnsubscribe = null;
 
-  // Modal State for Hole Scoring
+  // Selected game in setup form
+  let setupSelectedGameType = 'golf';
+
+  // Modal State for Round Scoring
   let editingScoreCtx = {
     playerId: null,
     holeIdx: null,
     variant: 6,
-    slots: [], // array of card ranks
+    slots: [],
     activeSlotIdx: 0,
     directScore: 0
   };
 
-  // --- Firebase Initialization ---
+  // ==========================================================
+  // FIREBASE INITIALIZATION & SYNC
+  // ==========================================================
+
   function initFirebase() {
-    // If running on Firebase Hosting, it will automatically use the active project config if available
-    // or fallback to offline local storage gracefully
     try {
       if (window.firebase && firebase.apps.length === 0) {
-        // Look for window.firebaseConfig or hosting __/firebase/init.js
         if (window.firebaseConfig) {
           firebase.initializeApp(window.firebaseConfig);
         }
@@ -67,7 +128,7 @@
           loadGamesList();
         });
       } else {
-        console.warn('Firebase SDK initialized in local mode.');
+        console.warn('ScoreSheets initialized in local offline mode.');
         updateAuthUI();
         loadGamesList();
       }
@@ -78,8 +139,8 @@
     }
   }
 
-  // --- Local Storage Fallback & Helpers ---
-  const LOCAL_STORAGE_KEY = 'golf_scoresheets_games';
+  // Local Storage Fallback
+  const LOCAL_STORAGE_KEY = 'scoresheets_saved_matches';
 
   function getLocalGames() {
     try {
@@ -98,7 +159,10 @@
     }
   }
 
-  // --- UI Routing & Navigation ---
+  // ==========================================================
+  // UI ROUTING & NAVIGATION
+  // ==========================================================
+
   function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
     const target = document.getElementById(viewId);
@@ -108,7 +172,6 @@
     }
   }
 
-  // --- Auth UI Handler ---
   function updateAuthUI() {
     const authActionBtn = document.getElementById('btn-auth-action');
     const signedOutPane = document.getElementById('auth-signed-out-pane');
@@ -120,7 +183,7 @@
       authActionBtn.textContent = '👤 ' + (currentUser.displayName || currentUser.email || 'My Account');
       signedOutPane.style.display = 'none';
       signedInPane.style.display = 'block';
-      authUserName.textContent = currentUser.displayName || 'Golfer';
+      authUserName.textContent = currentUser.displayName || 'Player';
       authUserEmail.textContent = currentUser.email || '';
     } else {
       authActionBtn.textContent = '👤 Sign In';
@@ -129,8 +192,48 @@
     }
   }
 
-  // --- Game Calculation Logic ---
-  // Calculates score given an array of card ranks for variants: 4, 6, 8, 9
+  // ==========================================================
+  // HOME SCREEN & CATALOG
+  // ==========================================================
+
+  function renderGameCatalog() {
+    const container = document.getElementById('games-catalog-container');
+    container.innerHTML = Object.values(GAMES_REGISTRY).map(game => `
+      <div class="game-catalog-card ${game.featured ? 'featured' : ''}" data-game-id="${game.id}">
+        <div>
+          <div class="game-catalog-top">
+            <div class="game-catalog-icon">${game.icon}</div>
+            <div>
+              <h4 class="game-catalog-title">${escapeHtml(game.name)}</h4>
+              <span class="game-catalog-badge">${escapeHtml(game.badge)}</span>
+            </div>
+          </div>
+          <p class="game-catalog-desc" style="margin-top: 0.75rem;">${escapeHtml(game.description)}</p>
+        </div>
+        <div class="game-catalog-footer">
+          <span class="game-catalog-meta">${game.hasCardCalculator ? '🎴 Card Calculator' : '🔢 Custom Scoring'}</span>
+          <button type="button" class="btn btn-primary btn-sm btn-quick-start" data-game-type="${game.id}">
+            Play Now ➔
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.btn-quick-start').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const type = btn.getAttribute('data-game-type');
+        setupSelectedGameType = type;
+        initSetupForm(type);
+        showView('view-setup');
+      });
+    });
+  }
+
+  // ==========================================================
+  // GOLF CARD GAME SCORING ENGINE
+  // ==========================================================
+
   function calculateGolfCardsScore(variant, cards) {
     const numCards = parseInt(variant, 10);
     const cols = numCards === 4 ? 2 : numCards === 6 ? 3 : numCards === 8 ? 4 : 3;
@@ -139,7 +242,6 @@
     let total = 0;
     const pairedSlotIndices = new Set();
 
-    // Check pairs per column
     for (let c = 0; c < cols; c++) {
       if (rows === 2) {
         const topIdx = c;
@@ -148,15 +250,13 @@
         const botCard = cards[botIdx];
 
         if (topCard && botCard && topCard === botCard) {
-          // Column pair matches! Scores 0 pts
           pairedSlotIndices.add(topIdx);
           pairedSlotIndices.add(botIdx);
-          // 0 points added
         } else {
-          if (topCard && CARD_MAP[topCard]) total += CARD_MAP[topCard].pts;
-          if (botCard && CARD_MAP[botCard]) total += CARD_MAP[botCard].pts;
+          if (topCard && GOLF_CARD_MAP[topCard]) total += GOLF_CARD_MAP[topCard].pts;
+          if (botCard && GOLF_CARD_MAP[botCard]) total += GOLF_CARD_MAP[botCard].pts;
         }
-      } else if (rows === 3) { // 9 cards
+      } else if (rows === 3) {
         const idx1 = c;
         const idx2 = c + cols;
         const idx3 = c + (cols * 2);
@@ -165,26 +265,25 @@
         const card3 = cards[idx3];
 
         if (card1 && card2 && card3 && card1 === card2 && card2 === card3) {
-          // Triple column match (Scores 0 or negative bonus depending on rule)
           pairedSlotIndices.add(idx1);
           pairedSlotIndices.add(idx2);
           pairedSlotIndices.add(idx3);
         } else if (card1 && card2 && card1 === card2) {
           pairedSlotIndices.add(idx1);
           pairedSlotIndices.add(idx2);
-          if (card3 && CARD_MAP[card3]) total += CARD_MAP[card3].pts;
+          if (card3 && GOLF_CARD_MAP[card3]) total += GOLF_CARD_MAP[card3].pts;
         } else if (card2 && card3 && card2 === card3) {
           pairedSlotIndices.add(idx2);
           pairedSlotIndices.add(idx3);
-          if (card1 && CARD_MAP[card1]) total += CARD_MAP[card1].pts;
+          if (card1 && GOLF_CARD_MAP[card1]) total += GOLF_CARD_MAP[card1].pts;
         } else if (card1 && card3 && card1 === card3) {
           pairedSlotIndices.add(idx1);
           pairedSlotIndices.add(idx3);
-          if (card2 && CARD_MAP[card2]) total += CARD_MAP[card2].pts;
+          if (card2 && GOLF_CARD_MAP[card2]) total += GOLF_CARD_MAP[card2].pts;
         } else {
-          if (card1 && CARD_MAP[card1]) total += CARD_MAP[card1].pts;
-          if (card2 && CARD_MAP[card2]) total += CARD_MAP[card2].pts;
-          if (card3 && CARD_MAP[card3]) total += CARD_MAP[card3].pts;
+          if (card1 && GOLF_CARD_MAP[card1]) total += GOLF_CARD_MAP[card1].pts;
+          if (card2 && GOLF_CARD_MAP[card2]) total += GOLF_CARD_MAP[card2].pts;
+          if (card3 && GOLF_CARD_MAP[card3]) total += GOLF_CARD_MAP[card3].pts;
         }
       }
     }
@@ -192,12 +291,81 @@
     return { total, pairedSlotIndices };
   }
 
-  // --- Setup Form Logic ---
-  function initSetupForm() {
+  // ==========================================================
+  // SETUP FORM DYNAMIC CONFIGURATION
+  // ==========================================================
+
+  function renderSetupGameTypeSelector() {
+    const container = document.getElementById('setup-game-type-selector');
+    container.innerHTML = Object.values(GAMES_REGISTRY).map(game => `
+      <label class="game-select-card">
+        <input type="radio" name="setupGameType" value="${game.id}" ${game.id === setupSelectedGameType ? 'checked' : ''} />
+        <div class="game-select-label">
+          <span class="icon">${game.icon}</span>
+          <div>
+            <strong>${escapeHtml(game.name)}</strong>
+            <small>${escapeHtml(game.badge)}</small>
+          </div>
+        </div>
+      </label>
+    `).join('');
+
+    container.querySelectorAll('input[name="setupGameType"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        setupSelectedGameType = e.target.value;
+        updateSetupFormForGame(setupSelectedGameType);
+      });
+    });
+  }
+
+  function updateSetupFormForGame(gameType) {
+    const game = GAMES_REGISTRY[gameType] || GAMES_REGISTRY.golf;
+
+    // Default title
+    const titleInput = document.getElementById('input-game-title');
+    if (!titleInput.value || titleInput.value.includes('Match') || titleInput.value.includes('Game')) {
+      titleInput.value = `${game.name} Match`;
+    }
+
+    // Variant Options
+    const variantOptionsContainer = document.getElementById('setup-variant-options');
+    const variantLabel = document.getElementById('setup-variant-label');
+    variantLabel.textContent = gameType === 'golf' ? 'Cards Per Player (Grid Variant)' : 'Win Condition / Rules Variant';
+
+    variantOptionsContainer.innerHTML = game.variants.map((v, idx) => `
+      <label class="choice-card">
+        <input type="radio" name="gameVariant" value="${v.id}" ${v.default || idx === 0 ? 'checked' : ''} />
+        <div class="choice-label">
+          <strong>${escapeHtml(v.name)}</strong>
+          <span>${escapeHtml(v.desc)}</span>
+        </div>
+      </label>
+    `).join('');
+
+    // Rounds / Holes Options
+    const roundsContainer = document.getElementById('setup-rounds-options');
+    const roundsLabel = document.getElementById('setup-rounds-label');
+    roundsLabel.textContent = `Number of ${game.roundPlural}`;
+
+    roundsContainer.innerHTML = game.roundOptions.map((r, idx) => `
+      <label class="choice-card">
+        <input type="radio" name="gameHoles" value="${r.count}" ${r.default || idx === 0 ? 'checked' : ''} />
+        <div class="choice-label">
+          <strong>${r.label}</strong>
+          <span>${escapeHtml(r.desc)}</span>
+        </div>
+      </label>
+    `).join('');
+  }
+
+  function initSetupForm(preferredGameType = 'golf') {
+    setupSelectedGameType = preferredGameType;
+    renderSetupGameTypeSelector();
+    updateSetupFormForGame(setupSelectedGameType);
+
     const container = document.getElementById('player-inputs-container');
     container.innerHTML = '';
-
-    const defaultNames = ['Tiger', 'Phil', 'Rory', 'Scottie'];
+    const defaultNames = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
     defaultNames.forEach((name, i) => {
       addPlayerInputRow(name, i + 1);
     });
@@ -232,14 +400,23 @@
     });
   }
 
-  // --- Create & Save Game ---
+  // ==========================================================
+  // CREATE & SAVE MATCHES
+  // ==========================================================
+
   async function createNewGameFromForm() {
-    const title = document.getElementById('input-game-title').value.trim() || 'Golf Card Match';
+    const gameConfig = GAMES_REGISTRY[setupSelectedGameType] || GAMES_REGISTRY.golf;
+    const title = document.getElementById('input-game-title').value.trim() || `${gameConfig.name} Match`;
+    
     const variantEl = document.querySelector('input[name="gameVariant"]:checked');
     const holesEl = document.querySelector('input[name="gameHoles"]:checked');
 
-    const variant = parseInt(variantEl ? variantEl.value : '6', 10);
-    const holes = parseInt(holesEl ? holesEl.value : '9', 10);
+    let variant = variantEl ? variantEl.value : gameConfig.defaultVariant;
+    if (!isNaN(parseInt(variant, 10)) && setupSelectedGameType === 'golf') {
+      variant = parseInt(variant, 10);
+    }
+
+    const holes = parseInt(holesEl ? holesEl.value : gameConfig.defaultRounds, 10);
 
     const playerInputs = document.querySelectorAll('.player-name-input');
     const players = [];
@@ -258,11 +435,18 @@
       return;
     }
 
+    let scoreType = gameConfig.scoreType;
+    if (setupSelectedGameType === 'generic_rounds' && variant === 'lowest') {
+      scoreType = 'lowest';
+    }
+
     const gameData = {
-      id: 'golf_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
+      id: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
+      gameType: setupSelectedGameType,
       title: title,
       variant: variant,
       holes: holes,
+      scoreType: scoreType,
       players: players,
       completed: false,
       createdAt: new Date().toISOString(),
@@ -272,14 +456,12 @@
 
     await saveGame(gameData);
     openGame(gameData);
-    showToast('Match created! 🏌️‍♂️', 'success');
+    showToast(`${gameConfig.name} match created! 🎲`, 'success');
   }
 
-  // --- Database Sync (Firestore & LocalStorage) ---
   async function saveGame(game) {
     game.updatedAt = new Date().toISOString();
 
-    // 1. Update local storage
     let localGames = getLocalGames();
     const existingIdx = localGames.findIndex(g => g.id === game.id);
     if (existingIdx >= 0) {
@@ -289,7 +471,6 @@
     }
     saveLocalGames(localGames);
 
-    // 2. Sync to Firestore if online & configured
     if (db) {
       try {
         await db.collection('games').doc(game.id).set(game, { merge: true });
@@ -298,6 +479,7 @@
             .collection('savedGames').doc(game.id)
             .set({
               id: game.id,
+              gameType: game.gameType || 'golf',
               title: game.title,
               variant: game.variant,
               holes: game.holes,
@@ -314,11 +496,9 @@
   async function deleteGame(gameId) {
     if (!confirm('Are you sure you want to delete this scorecard?')) return;
 
-    // Remove local
     let localGames = getLocalGames().filter(g => g.id !== gameId);
     saveLocalGames(localGames);
 
-    // Remove firestore
     if (db) {
       try {
         await db.collection('games').doc(gameId).delete();
@@ -330,7 +510,7 @@
       }
     }
 
-    showToast('Game deleted', 'success');
+    showToast('Match deleted', 'success');
     loadGamesList();
     showView('view-home');
   }
@@ -341,14 +521,12 @@
 
     let games = getLocalGames();
 
-    // Fetch from Firestore if available
     if (db) {
       try {
-        const snap = await db.collection('games').orderBy('updatedAt', 'desc').limit(20).get();
+        const snap = await db.collection('games').orderBy('updatedAt', 'desc').limit(25).get();
         const firestoreGames = [];
         snap.forEach(doc => firestoreGames.push(doc.data()));
         if (firestoreGames.length > 0) {
-          // Merge
           const gameMap = {};
           games.forEach(g => { gameMap[g.id] = g; });
           firestoreGames.forEach(g => { gameMap[g.id] = g; });
@@ -356,7 +534,7 @@
           saveLocalGames(games);
         }
       } catch (err) {
-        console.warn('Could not fetch Firestore games:', err);
+        console.warn('Could not fetch Firestore matches:', err);
       }
     }
 
@@ -369,9 +547,9 @@
     if (games.length === 0) {
       listContainer.innerHTML = `
         <div class="empty-state" style="grid-column: 1/-1;">
-          <div class="empty-state-icon">⛳</div>
-          <h4>No Saved Matches Yet</h4>
-          <p>Start a new game to begin tracking cards, scores, and column pairs.</p>
+          <div class="empty-state-icon">📝</div>
+          <h4>No Matches Played Yet</h4>
+          <p>Choose an available ScoreSheet above to start tracking your next game.</p>
           <button type="button" class="btn btn-primary btn-sm" id="btn-empty-new-game" style="margin-top: 1rem;">
             ➕ Start First Match
           </button>
@@ -379,14 +557,17 @@
       `;
       const btn = document.getElementById('btn-empty-new-game');
       if (btn) btn.addEventListener('click', () => {
-        initSetupForm();
+        initSetupForm('golf');
         showView('view-setup');
       });
       return;
     }
 
     listContainer.innerHTML = games.map(game => {
-      // Calculate leader
+      const gType = game.gameType || 'golf';
+      const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+      const isLowestWins = game.scoreType === 'lowest';
+
       let leaderText = 'No scores recorded yet';
       const playerTotals = game.players.map(p => {
         const sum = p.scores.reduce((acc, s) => s !== null ? acc + s : acc, 0);
@@ -396,7 +577,11 @@
 
       const activePlayers = playerTotals.filter(p => p.playedCount > 0);
       if (activePlayers.length > 0) {
-        activePlayers.sort((a, b) => a.sum - b.sum);
+        if (isLowestWins) {
+          activePlayers.sort((a, b) => a.sum - b.sum);
+        } else {
+          activePlayers.sort((a, b) => b.sum - a.sum);
+        }
         leaderText = `Leader: <strong>${escapeHtml(activePlayers[0].name)} (${activePlayers[0].sum} pts)</strong>`;
       }
 
@@ -406,15 +591,19 @@
         year: 'numeric'
       });
 
+      const roundLabel = `${game.holes} ${gameConfig.roundPlural || 'Rounds'}`;
+      const variantDisplay = typeof game.variant === 'number' ? `${game.variant}-Card` : `${game.variant}`;
+
       return `
         <div class="game-item-card" data-game-id="${escapeHtml(game.id)}">
           <div class="game-item-top">
-            <h4 class="game-item-title">${escapeHtml(game.title)}</h4>
+            <h4 class="game-item-title">${gameConfig.icon} ${escapeHtml(game.title)}</h4>
             <span class="game-item-date">${formattedDate}</span>
           </div>
           <div class="game-item-meta">
-            <span class="meta-pill variant">${game.variant}-Card</span>
-            <span class="meta-pill">${game.holes} Holes</span>
+            <span class="meta-pill variant">${escapeHtml(gameConfig.name)}</span>
+            <span class="meta-pill">${variantDisplay}</span>
+            <span class="meta-pill">${roundLabel}</span>
             <span class="meta-pill">${game.players.length} Players</span>
             ${game.completed ? '<span class="meta-pill completed">Completed</span>' : ''}
           </div>
@@ -422,14 +611,13 @@
             <span>${leaderText}</span>
           </div>
           <div class="game-item-actions">
-            <button type="button" class="btn btn-primary btn-sm btn-open-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Open Scorecard</button>
+            <button type="button" class="btn btn-primary btn-sm btn-open-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Open ScoreSheet</button>
             <button type="button" class="btn btn-outline btn-sm btn-delete-card" data-game-id="${escapeHtml(game.id)}">🗑️</button>
           </div>
         </div>
       `;
     }).join('');
 
-    // Bind item clicks
     listContainer.querySelectorAll('.btn-open-game').forEach(btn => {
       btn.addEventListener('click', () => {
         const gId = btn.getAttribute('data-game-id');
@@ -447,11 +635,13 @@
     });
   }
 
-  // --- Active Scorecard View ---
+  // ==========================================================
+  // ACTIVE SCORECARD VIEW
+  // ==========================================================
+
   function openGame(game) {
     activeGame = game;
 
-    // Subscribe to real-time Firestore updates if game has id and db is active
     if (firestoreUnsubscribe) {
       firestoreUnsubscribe();
       firestoreUnsubscribe = null;
@@ -460,9 +650,7 @@
     if (db && game.id) {
       firestoreUnsubscribe = db.collection('games').doc(game.id).onSnapshot(doc => {
         if (doc.exists) {
-          const freshData = doc.data();
-          // Merge local in-progress state if remote is updated
-          activeGame = freshData;
+          activeGame = doc.data();
           renderScorecard();
         }
       });
@@ -475,11 +663,16 @@
   function renderScorecard() {
     if (!activeGame) return;
 
+    const gType = activeGame.gameType || 'golf';
+    const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+    const isLowestWins = activeGame.scoreType === 'lowest';
+
     document.getElementById('sc-game-title').textContent = activeGame.title;
-    document.getElementById('sc-variant-chip').textContent = `${activeGame.variant}-Card Golf`;
-    document.getElementById('sc-holes-chip').textContent = `${activeGame.holes} Holes`;
-    document.getElementById('sc-players-chip').textContent = `${activeGame.players.length} Players`;
-    
+    document.getElementById('sc-game-type-chip').textContent = `${gameConfig.icon} ${gameConfig.name}`;
+    document.getElementById('sc-variant-chip').textContent = typeof activeGame.variant === 'number' ? `${activeGame.variant}-Card` : `${activeGame.variant}`;
+    document.getElementById('sc-holes-chip').textContent = `${activeGame.holes} ${gameConfig.roundPlural || 'Rounds'}`;
+    document.getElementById('sc-win-condition-chip').textContent = isLowestWins ? 'Lowest Wins ⛳' : 'Highest Wins 🏆';
+
     const statusChip = document.getElementById('sc-status-chip');
     statusChip.textContent = activeGame.completed ? 'Completed' : 'In Progress';
     statusChip.className = `meta-pill ${activeGame.completed ? 'completed' : 'variant'}`;
@@ -489,6 +682,10 @@
   }
 
   function renderLeaderboardBar() {
+    const isLowestWins = activeGame.scoreType === 'lowest';
+    const gType = activeGame.gameType || 'golf';
+    const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+
     const bar = document.getElementById('sc-leaderboard-bar');
     const playerStats = activeGame.players.map((p, origIdx) => {
       const sum = p.scores.reduce((acc, s) => s !== null ? acc + s : acc, 0);
@@ -496,7 +693,11 @@
       return { player: p, sum, playedCount, origIdx };
     });
 
-    playerStats.sort((a, b) => a.sum - b.sum);
+    if (isLowestWins) {
+      playerStats.sort((a, b) => a.sum - b.sum);
+    } else {
+      playerStats.sort((a, b) => b.sum - a.sum);
+    }
 
     bar.innerHTML = playerStats.map((item, rank) => {
       const isFirst = rank === 0 && item.playedCount > 0;
@@ -505,7 +706,7 @@
           <div class="leader-rank">#${rank + 1}</div>
           <div class="leader-info">
             <div class="leader-name">${escapeHtml(item.player.name)}</div>
-            <div class="leader-sub">${item.playedCount}/${activeGame.holes} holes played</div>
+            <div class="leader-sub">${item.playedCount}/${activeGame.holes} ${gameConfig.roundPlural.toLowerCase()}</div>
           </div>
           <div class="leader-score">${item.sum}</div>
         </div>
@@ -518,18 +719,22 @@
     const tbody = document.getElementById('score-table-body');
     const tfootRow = document.getElementById('score-table-foot-row');
 
+    const gType = activeGame.gameType || 'golf';
+    const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+    const roundName = gameConfig.roundName || 'Round';
+
     // Headers
-    let headHtml = '<th class="hole-col">Hole</th>';
+    let headHtml = `<th class="hole-col">${roundName}</th>`;
     activeGame.players.forEach(p => {
       headHtml += `<th>${escapeHtml(p.name)}</th>`;
     });
     theadRow.innerHTML = headHtml;
 
-    // Body Rows (Holes 1 to N)
+    // Body Rows
     let bodyHtml = '';
     for (let h = 0; h < activeGame.holes; h++) {
-      const holeNumber = h + 1;
-      bodyHtml += `<tr><td class="hole-col">Hole ${holeNumber}</td>`;
+      const roundNum = h + 1;
+      bodyHtml += `<tr><td class="hole-col">${roundName} ${roundNum}</td>`;
       activeGame.players.forEach(p => {
         const score = p.scores[h];
         const hasScore = score !== null && score !== undefined;
@@ -537,7 +742,7 @@
         if (hasScore) {
           scoreClass += ' has-score';
           if (score < 0) scoreClass += ' negative';
-          if (score >= 15) scoreClass += ' high-score';
+          if (score >= 20) scoreClass += ' high-score';
         }
 
         const scoreText = hasScore ? score : '-';
@@ -562,7 +767,7 @@
     });
     tfootRow.innerHTML = footHtml;
 
-    // Bind cell buttons
+    // Bind cell clicks
     tbody.querySelectorAll('.score-cell-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const pId = btn.getAttribute('data-player-id');
@@ -572,37 +777,48 @@
     });
   }
 
-  // --- Score Input & Calculator Modal Logic ---
+  // ==========================================================
+  // SCORE INPUT & CALCULATOR MODAL
+  // ==========================================================
+
   function openScoreModal(playerId, holeIdx) {
     const player = activeGame.players.find(p => p.id === playerId);
     if (!player) return;
 
+    const gType = activeGame.gameType || 'golf';
+    const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+
     editingScoreCtx.playerId = playerId;
     editingScoreCtx.holeIdx = holeIdx;
-    editingScoreCtx.variant = activeGame.variant;
+    editingScoreCtx.variant = typeof activeGame.variant === 'number' ? activeGame.variant : 6;
     editingScoreCtx.activeSlotIdx = 0;
 
-    document.getElementById('modal-score-title').textContent = `Hole ${holeIdx + 1} Score - ${player.name}`;
+    document.getElementById('modal-score-title').textContent = `${gameConfig.roundName} ${holeIdx + 1} Score - ${player.name}`;
 
-    // Initialize or load existing card slots
-    const existingCards = player.cardDetails && player.cardDetails[holeIdx];
-    if (existingCards && Array.isArray(existingCards) && existingCards.length === activeGame.variant) {
-      editingScoreCtx.slots = [...existingCards];
+    // Handle Card Calculator visibility
+    const calcTabBtn = document.getElementById('tab-btn-calculator');
+
+    if (gameConfig.hasCardCalculator) {
+      calcTabBtn.style.display = 'inline-block';
+      const existingCards = player.cardDetails && player.cardDetails[holeIdx];
+      if (existingCards && Array.isArray(existingCards) && existingCards.length === editingScoreCtx.variant) {
+        editingScoreCtx.slots = [...existingCards];
+      } else {
+        editingScoreCtx.slots = Array(editingScoreCtx.variant).fill('K');
+      }
+      renderCardSlotsGrid();
+      renderCardPalette();
+      updateModalCalculatedScore();
+      switchModalTab('tab-calculator');
     } else {
-      // Default empty/King slots
-      editingScoreCtx.slots = Array(activeGame.variant).fill('K');
+      calcTabBtn.style.display = 'none';
+      switchModalTab('tab-numpad');
     }
 
     const existingScore = player.scores[holeIdx];
     editingScoreCtx.directScore = existingScore !== null ? existingScore : 0;
     document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
-
-    renderCardSlotsGrid();
-    renderCardPalette();
-    updateModalCalculatedScore();
-
-    // Default to Calculator tab
-    switchModalTab('tab-calculator');
+    document.getElementById('input-direct-custom').value = '';
 
     const modal = document.getElementById('modal-score-input');
     modal.classList.add('is-open');
@@ -620,7 +836,7 @@
     const { pairedSlotIndices } = calculateGolfCardsScore(editingScoreCtx.variant, editingScoreCtx.slots);
 
     editingScoreCtx.slots.forEach((rank, idx) => {
-      const cardInfo = CARD_MAP[rank] || CARD_MAP['K'];
+      const cardInfo = GOLF_CARD_MAP[rank] || GOLF_CARD_MAP['K'];
       const isSelected = idx === editingScoreCtx.activeSlotIdx;
       const isPaired = pairedSlotIndices.has(idx);
       const isRed = cardInfo.color === 'red';
@@ -646,7 +862,7 @@
     const palette = document.getElementById('calc-card-palette');
     palette.innerHTML = '';
 
-    CARD_RANKS.forEach(card => {
+    GOLF_CARD_RANKS.forEach(card => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `card-pick-btn ${card.color === 'red' ? 'red-card' : ''}`;
@@ -656,14 +872,10 @@
       `;
 
       btn.addEventListener('click', () => {
-        // Set card in currently selected slot
         editingScoreCtx.slots[editingScoreCtx.activeSlotIdx] = card.rank;
-
-        // Auto-advance to next slot
         if (editingScoreCtx.activeSlotIdx < editingScoreCtx.variant - 1) {
           editingScoreCtx.activeSlotIdx++;
         }
-
         renderCardSlotsGrid();
         updateModalCalculatedScore();
       });
@@ -691,7 +903,10 @@
     let finalScore = 0;
     let cardDetails = null;
 
-    if (activeTab.id === 'tab-calculator') {
+    const gType = activeGame.gameType || 'golf';
+    const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+
+    if (activeTab.id === 'tab-calculator' && gameConfig.hasCardCalculator) {
       const { total } = calculateGolfCardsScore(editingScoreCtx.variant, editingScoreCtx.slots);
       finalScore = total;
       cardDetails = [...editingScoreCtx.slots];
@@ -707,7 +922,7 @@
       await saveGame(activeGame);
       renderScorecard();
       closeScoreModal();
-      showToast(`Hole ${editingScoreCtx.holeIdx + 1} score saved for ${player.name}`, 'success');
+      showToast(`${gameConfig.roundName} ${editingScoreCtx.holeIdx + 1} score saved for ${player.name}`, 'success');
     }
   }
 
@@ -719,11 +934,14 @@
       await saveGame(activeGame);
       renderScorecard();
       closeScoreModal();
-      showToast(`Hole ${editingScoreCtx.holeIdx + 1} cleared`, 'success');
+      showToast(`Score cleared`, 'success');
     }
   }
 
-  // --- Share / Link Helper ---
+  // ==========================================================
+  // UTILITIES & EVENT LISTENERS
+  // ==========================================================
+
   function shareCurrentGame() {
     if (!activeGame) return;
     const url = window.location.origin + window.location.pathname + '?game=' + activeGame.id;
@@ -738,7 +956,6 @@
     }
   }
 
-  // --- Toast Notifications ---
   function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
@@ -762,21 +979,20 @@
       .replace(/'/g, '&#039;');
   }
 
-  // --- Event Listeners Setup ---
   function setupEventListeners() {
-    // Navigation & Buttons
+    // Nav Brand & Buttons
     document.getElementById('nav-brand').addEventListener('click', () => {
       loadGamesList();
       showView('view-home');
     });
 
     document.getElementById('btn-hero-new-game').addEventListener('click', () => {
-      initSetupForm();
+      initSetupForm('golf');
       showView('view-setup');
     });
 
     document.getElementById('btn-new-game-nav').addEventListener('click', () => {
-      initSetupForm();
+      initSetupForm('golf');
       showView('view-setup');
     });
 
@@ -834,7 +1050,7 @@
       activeGame.completed = !activeGame.completed;
       await saveGame(activeGame);
       renderScorecard();
-      showToast(activeGame.completed ? 'Match marked as completed! 🏆' : 'Match set to in progress', 'success');
+      showToast(activeGame.completed ? 'Match marked as completed! 🏆' : 'Match in progress', 'success');
     });
 
     // Score Modal Tabs & Actions
@@ -860,6 +1076,15 @@
         }
         document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
       });
+    });
+
+    // Custom Direct Points Field
+    document.getElementById('btn-apply-custom-direct').addEventListener('click', () => {
+      const val = parseInt(document.getElementById('input-direct-custom').value, 10);
+      if (!isNaN(val)) {
+        editingScoreCtx.directScore = val;
+        document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
+      }
     });
 
     // Auth Modal Actions
@@ -918,14 +1143,15 @@
     }
   }
 
-  // --- Service Worker for Offline PWA Support ---
+  // Service Worker for Offline PWA Support
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js').catch(() => {});
   }
 
-  // --- Bootstrap on DOM Ready ---
+  // Bootstrap
   document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
+    renderGameCatalog();
     initFirebase();
   });
 

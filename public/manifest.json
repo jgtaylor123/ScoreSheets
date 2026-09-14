@@ -1,10 +1,10 @@
 {
-  "name": "Golf Card Game Scorekeeper",
-  "short_name": "Golf Scores",
-  "description": "Interactive scorekeeper and card point calculator for 4-card, 6-card, 8-card, and 9-card Golf card games.",
+  "name": "ScoreSheets",
+  "short_name": "ScoreSheets",
+  "description": "Universal digital scorekeeper, card calculator, and match tracker for tabletop, card, and board games.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#062e1c",
+  "background_color": "#061a12",
   "theme_color": "#15803d",
   "icons": [
     {

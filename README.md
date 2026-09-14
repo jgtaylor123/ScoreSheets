@@ -1,49 +1,48 @@
-# ⛳ Golf Card Game Scorekeeper (ScoreSheets)
+# 📝 ScoreSheets
 
-A real-time multiplayer digital scorecard and interactive card calculator for the **Golf Card Game** (supporting 4-card, 6-card, 8-card, and 9-card variations). Built to run on **Firebase Hosting** and sync across players with **Google Cloud Firestore**.
-
----
-
-## 🌟 Features
-
-- **🎴 Smart Visual Card Calculator**: Tap cards into your round's grid layout (2x2, 2x3, 2x4, or 3x3) to automatically calculate point totals, column pair cancellations (pairs score 0 pts), Kings (0 pts), and Jokers (-2 pts).
-- **🔢 Quick Score Direct Entry**: Fast numeric entry / numpad for rapid scoring without the visual card layout if preferred.
-- **🏆 Real-Time Live Standings & Podiums**: Dynamic rankings, hole-by-hole totals, and color-coded status badges.
-- **🔄 Multi-Hole Formats**: Support for 6-hole short games, 9-hole matches, and 18-hole full championship games.
-- **☁️ Cloud Firestore Sync & Share**: Live cloud sync with shareable match links (`?game=<id>`).
-- **📱 PWA & Mobile-First Responsive Design**: Works seamlessly on mobile phones at the table and on desktop, complete with offline ServiceWorker caching.
+A modern, real-time multiplayer digital scorekeeper and match tracker for tabletop, card, and board games. Backed by **Firebase Hosting** and **Google Cloud Firestore**.
 
 ---
 
-## 🃏 Standard Golf Card Game Scoring
+## 🌟 Available ScoreSheets & Games
 
-| Card | Points | Notes |
-| :--- | :--- | :--- |
-| **Joker** | **-2 Pts** | Lowest scoring card (Bonus) |
-| **King (K)** | **0 Pts** | Zero points |
-| **Ace (A)** | **1 Pt** | One point |
-| **2 through 10** | **Face Value** | 2 = 2 pts, 3 = 3 pts ... 10 = 10 pts |
-| **Jack (J), Queen (Q)** | **10 Pts** | High penalty face cards |
+### 1. ⛳ Golf Card Game
+- **Interactive Card Layout Calculator**: Supports 4-card ($2 \times 2$), 6-card ($2 \times 3$), 8-card ($2 \times 4$), and 9-card ($3 \times 3$) variations.
+- **Smart Column Pair Rules**: Automatically cancels matching vertical card pairs to $0$ points.
+- **Special Card Values**: Automatically scores Jokers ($-2$ pts), Kings ($0$ pts), Aces ($1$ pt), and Face cards ($10$ pts).
+- **Match Formats**: 6-hole, 9-hole, and 18-hole matches with lowest-score-wins leaderboard.
 
-> **Column Pair Cancellation Rule:** Any matching pair in the same vertical column cancels out to **0 points** (e.g., a column with two 8s scores 0 instead of 16).
+### 2. 📝 Round-by-Round / Custom Game Sheets
+- **Universal Round Tracker**: Flexible scorepad for games like Rummy, Farkle, Yahtzee, Wizard, Phase 10, Hearts, Spades, etc.
+- **Configurable Win Conditions**: Toggle between *Highest Score Wins* and *Lowest Score Wins*.
+- **Quick Numpad & Custom Points Entry**: Rapid point entry with support for positive and negative scores.
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## ✨ Platform Features
 
-- **Frontend:** HTML5, Modern Vanilla JavaScript (ES6+), CSS3 Grid & Flexbox, SVG graphics.
+- **🏆 Real-Time Multiplayer Leaderboards**: Live standings with podium highlights, sub-totals, and round progress.
+- **☁️ Cloud Firestore Sync & Offline PWA**: Real-time cloud sync across devices with offline `localStorage` and ServiceWorker caching.
+- **🔗 Instant Match Sharing**: Share match scorecards via URL (`?game=<id>`).
+- **📱 Responsive Mobile-First Design**: Optimized for tabletop gameplay on smartphones, tablets, and desktop.
+- **👤 Google Sign-In & Guest Play**: Play without signing in or log in with Google to sync matches across devices.
+
+---
+
+## 🛠️ Architecture & Tech Stack
+
+- **Frontend:** HTML5, Modern Vanilla JavaScript (ES6+), CSS3 Grid & Flexbox, SVG assets.
 - **Database:** Firebase Cloud Firestore.
-- **Hosting:** Firebase Hosting with custom cache-control headers.
-- **Authentication:** Firebase Auth (Google Sign-In + Guest fallback).
+- **Hosting:** Firebase Hosting.
+- **Auth:** Firebase Authentication (Google Auth + Guest fallback).
 
 ---
 
-## 🚀 Firebase Setup & Deployment
+## 🚀 Setup & Deployment
 
-### 1. Set Firebase Project
-To associate with your Firebase project:
+### 1. Associate Firebase Project
 ```bash
-firebase use <your-firebase-project-id>
+firebase use <project-id>
 ```
 
 ### 2. Run Locally
@@ -53,12 +52,13 @@ npx serve public
 firebase serve --only hosting
 ```
 
-### 3. Deploy
+### 3. Deploy to Hosting & Firestore
 ```bash
 firebase deploy --only hosting,firestore:rules
 ```
 
 ---
 
-## 📦 Repository & GitHub
-Backed up under `jgtaylor123` GitHub account.
+## 📦 GitHub Repository
+Backed up at: [https://github.com/jgtaylor123/ScoreSheets](https://github.com/jgtaylor123/ScoreSheets)
+

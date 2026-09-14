@@ -1,7 +1,7 @@
 {
   "name": "scoresheets",
   "version": "1.0.0",
-  "description": "Golf Card Game Scorekeeper - Real-time multiplayer score tracking, card calculator, and game history powered by Firebase Hosting & Firestore",
+  "description": "ScoreSheets - Universal digital scorekeeper and match tracker for card, board, and tabletop games powered by Firebase Hosting & Firestore",
   "private": true,
   "scripts": {
     "serve": "firebase serve --only hosting",
@@ -10,11 +10,13 @@
     "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "keywords": [
-    "golf-card-game",
+    "scoresheets",
     "scorekeeper",
+    "golf-card-game",
+    "card-games",
+    "board-games",
     "firebase",
-    "firestore",
-    "scoresheet"
+    "firestore"
   ],
   "author": "Jonathan Taylor <jgtaylor@gmail.com>",
   "license": "MIT"
