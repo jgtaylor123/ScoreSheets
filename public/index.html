@@ -251,15 +251,22 @@
       <section id="view-scorecard" class="view">
         <div class="scorecard-header">
           <div class="scorecard-title-area">
-            <h2 id="sc-game-title">Game Title</h2>
-            <div class="scorecard-meta-chips">
-              <span class="meta-pill variant" id="sc-game-type-chip">⛳ Golf Card Game</span>
-              <span class="meta-pill" id="sc-variant-chip">6-Card</span>
-              <span class="meta-pill" id="sc-holes-chip">9 Holes</span>
-              <span class="meta-pill" id="sc-win-condition-chip">Lowest Score Wins</span>
-              <span class="meta-pill completed" id="sc-status-chip">In Progress</span>
-              <span class="meta-pill" id="sc-sync-chip" style="background: rgba(59, 130, 246, 0.18); color: #93c5fd;">⚡ Offline Mode</span>
-              <button type="button" class="meta-pill" id="btn-wakelock-chip" style="cursor: pointer; border: 1px solid transparent;" title="Tap to toggle Screen Stay Awake">🔆 Screen Kept Awake</button>
+            <div class="scorecard-title-row">
+              <h2 id="sc-game-title">Game Title</h2>
+              <button type="button" class="btn btn-outline btn-sm btn-details-toggle" id="btn-toggle-details" aria-expanded="false" aria-controls="sc-meta-details">
+                <span class="details-icon">ℹ️</span> <span id="btn-details-text">Details</span>
+              </button>
+            </div>
+            <div class="scorecard-meta-chips" id="sc-meta-details">
+              <div class="scorecard-meta-chips-inner">
+                <span class="meta-pill variant" id="sc-game-type-chip">⛳ Golf Card Game</span>
+                <span class="meta-pill" id="sc-variant-chip">6-Card</span>
+                <span class="meta-pill" id="sc-holes-chip">9 Holes</span>
+                <span class="meta-pill" id="sc-win-condition-chip">Lowest Score Wins</span>
+                <span class="meta-pill completed" id="sc-status-chip">In Progress</span>
+                <span class="meta-pill" id="sc-sync-chip" style="background: rgba(59, 130, 246, 0.18); color: #93c5fd;">⚡ Offline Mode</span>
+                <button type="button" class="meta-pill" id="btn-wakelock-chip" style="cursor: pointer; border: 1px solid transparent;" title="Tap to toggle Screen Stay Awake">🔆 Screen Kept Awake</button>
+              </div>
             </div>
           </div>
           <div class="scorecard-actions">
@@ -576,7 +583,7 @@
     <script src="/__/firebase/init.js"></script>
 
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=27"></script>
+    <script src="/app.js?v=28"></script>
   </body>
 </html>
 

@@ -1582,6 +1582,30 @@
     });
   }
 
+  // Match Details Drawer State
+  let isDetailsDrawerOpen = false;
+
+  function toggleDetailsDrawer(forceState) {
+    const chipsDrawer = document.getElementById('sc-meta-details');
+    const toggleBtn = document.getElementById('btn-toggle-details');
+    const toggleText = document.getElementById('btn-details-text');
+    if (!chipsDrawer || !toggleBtn) return;
+
+    isDetailsDrawerOpen = typeof forceState === 'boolean' ? forceState : !isDetailsDrawerOpen;
+
+    if (isDetailsDrawerOpen) {
+      chipsDrawer.classList.add('is-open');
+      toggleBtn.classList.add('is-active');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+      if (toggleText) toggleText.textContent = 'Hide Details';
+    } else {
+      chipsDrawer.classList.remove('is-open');
+      toggleBtn.classList.remove('is-active');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      if (toggleText) toggleText.textContent = 'Details';
+    }
+  }
+
   function renderScorecard() {
     if (!activeGame) return;
 
@@ -1616,6 +1640,9 @@
         syncChip.style.color = '#93c5fd';
       }
     }
+
+    // Refresh Details toggle state
+    toggleDetailsDrawer(isDetailsDrawerOpen);
 
     // Winner announcement banner & Toggle button state
     const winnerBanner = document.getElementById('sc-winner-banner');
@@ -2313,6 +2340,13 @@
     document.getElementById('btn-delete-current-game').addEventListener('click', () => {
       if (activeGame) deleteGame(activeGame.id);
     });
+
+    const toggleDetailsBtn = document.getElementById('btn-toggle-details');
+    if (toggleDetailsBtn) {
+      toggleDetailsBtn.addEventListener('click', () => {
+        toggleDetailsDrawer();
+      });
+    }
 
     document.getElementById('btn-finish-game-toggle').addEventListener('click', async () => {
       if (activeGame) {

@@ -1116,23 +1116,78 @@ body.splash-active {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
 }
 
-.scorecard-title-area h2 {
+.scorecard-title-area {
+  flex: 1;
+  min-width: 260px;
+}
+
+.scorecard-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.scorecard-title-row h2 {
   font-size: 1.5rem;
   font-weight: 800;
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  margin: 0;
 }
 
+.btn-details-toggle {
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-sub);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-details-toggle:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: var(--fairway-green);
+  color: #ffffff;
+}
+
+.btn-details-toggle.is-active {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: var(--fairway-green);
+  color: #ffffff;
+}
+
+/* Collapsible Details Drawer with Smooth Slide Transition */
 .scorecard-meta-chips {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s cubic-bezier(0.16, 1, 0.3, 1), margin-top 0.25s ease;
+  margin-top: 0;
+  overflow: hidden;
+}
+
+.scorecard-meta-chips.is-open {
+  grid-template-rows: 1fr;
+  margin-top: 0.75rem;
+}
+
+.scorecard-meta-chips-inner {
+  min-height: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.35rem;
+  align-items: center;
 }
 
 .scorecard-actions {
