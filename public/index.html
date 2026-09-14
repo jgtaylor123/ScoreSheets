@@ -128,24 +128,8 @@
     <!-- Main Views Container -->
     <main class="container">
       
-      <!-- VIEW: HOME (Dashboard, Game Catalog & Saved Games) -->
+      <!-- VIEW: HOME (Active Matches & Match History) -->
       <section id="view-home" class="view is-active">
-        <div class="hero-card">
-          <div class="hero-badge">⚡ SETTLE THE SCORE &bull; REAL-TIME SCORESHEETS</div>
-          <h2 class="hero-title">Track Every Turn with <span>Precision</span></h2>
-          <p class="hero-desc">
-            Ditch paper scorepads. Track golf card games, turn-based card games, and tabletop matches with automatic scoring, column pair cancellations, and live leaderboards.
-          </p>
-          <div class="hero-actions">
-            <button type="button" class="btn btn-primary" id="btn-hero-new-game">
-              ➕ Start New Sheet
-            </button>
-            <button type="button" class="btn btn-outline" id="btn-hero-rules">
-              📖 Rules &amp; Card Values
-            </button>
-          </div>
-        </div>
-
         <!-- AUTHENTICATED ACTIVE SHEETS SECTION (Shown when user has open/active games) -->
         <section id="section-active-sheets" class="hidden" style="margin-bottom: 2.5rem;">
           <div class="boards-heading">
@@ -646,7 +630,7 @@
     <script src="/__/firebase/init.js"></script>
 
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=14"></script>
+    <script src="/app.js?v=15"></script>
   </body>
 </html>
 

@@ -2104,10 +2104,13 @@
       showView('view-home');
     });
 
-    document.getElementById('btn-hero-new-game').addEventListener('click', () => {
-      initSetupForm('golf');
-      showView('view-setup');
-    });
+    const heroNewGameBtn = document.getElementById('btn-hero-new-game');
+    if (heroNewGameBtn) {
+      heroNewGameBtn.addEventListener('click', () => {
+        initSetupForm('golf');
+        showView('view-setup');
+      });
+    }
 
     document.getElementById('btn-new-game-nav').addEventListener('click', () => {
       initSetupForm('golf');
@@ -2126,9 +2129,12 @@
       showView('view-rules');
     });
 
-    document.getElementById('btn-hero-rules').addEventListener('click', () => {
-      showView('view-rules');
-    });
+    const heroRulesBtn = document.getElementById('btn-hero-rules');
+    if (heroRulesBtn) {
+      heroRulesBtn.addEventListener('click', () => {
+        showView('view-rules');
+      });
+    }
 
     document.getElementById('btn-close-rules').addEventListener('click', () => {
       if (activeGame) {
