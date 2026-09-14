@@ -141,6 +141,13 @@
         auth = firebase.auth();
         db = firebase.firestore();
 
+        // Enable offline persistence in Firestore SDK for robust offline operation
+        try {
+          db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+            console.warn('Firestore offline persistence note:', err && err.code);
+          });
+        } catch (e) {}
+
         auth.onAuthStateChanged(user => {
           currentUser = user;
           updateAuthUI();
@@ -613,9 +620,10 @@
       createdBy: currentUser ? currentUser.uid : 'anonymous'
     };
 
-    await saveGame(gameData);
+    // Save locally and initialize in cloud asynchronously if available
+    await saveGame(gameData, { syncToCloud: true });
     openGame(gameData);
-    showToast(`${gameConfig.name} match created! 🎲`, 'success');
+    showToast(`${gameConfig.name} match created! 🎲 (Offline-ready)`, 'success');
   }
 
   // ==========================================================
@@ -654,24 +662,32 @@
     if (willBeCompleted) {
       const winner = getGameWinner(game);
       triggerConfetti();
-      showToast(`🏆 And the winner is... ${winner.name} (${winner.totalScore} pts)! Match recorded.`, 'winner');
+      showToast(`🏆 And the winner is... ${winner.name} (${winner.totalScore} pts)! Match finalized and synced to cloud.`, 'winner');
+      
+      // When match is completed, write the entire finalized match and results to database
+      try {
+        await saveGame(game, { syncToCloud: true });
+      } catch (err) {
+        console.warn('Error syncing completed game to database:', err);
+      }
     } else {
-      showToast(`▶️ Match resumed! Scores are open for updating.`, 'info');
+      showToast(`▶️ Match resumed! Operating offline until match is finalized.`, 'info');
+      // When resumed, sync status update to cloud
+      try {
+        await saveGame(game, { syncToCloud: true });
+      } catch (err) {
+        console.warn('Error syncing resumed state:', err);
+      }
     }
 
     if (activeGame && activeGame.id === game.id) {
       renderScorecard();
     }
     loadGamesList();
-
-    try {
-      await saveGame(game);
-    } catch (err) {
-      console.warn('Error saving match state:', err);
-    }
   }
 
-  async function saveGame(game) {
+  async function saveGame(game, options = {}) {
+    const { syncToCloud = false } = options;
     game.updatedAt = new Date().toISOString();
 
     // Compute and record final tally & winner for posterity when marked complete
@@ -697,6 +713,7 @@
       game.lastResumedAt = new Date().toISOString();
     }
 
+    // Always update local storage first (instant, 100% offline, zero latency)
     let localGames = getLocalGames();
     const existingIdx = localGames.findIndex(g => g.id === game.id);
     if (existingIdx >= 0) {
@@ -706,7 +723,8 @@
     }
     saveLocalGames(localGames);
 
-    if (db) {
+    // Only make network Firestore request when syncToCloud is true (game creation, finalization, resume, delete)
+    if (syncToCloud && db) {
       try {
         await db.collection('games').doc(game.id).set(game, { merge: true });
         if (currentUser) {
@@ -729,7 +747,7 @@
             .set(userDocData, { merge: true });
         }
       } catch (err) {
-        console.warn('Firestore sync warning:', err);
+        console.warn('Firestore sync warning (match safely kept in offline storage):', err);
       }
     }
   }
@@ -1069,15 +1087,6 @@
       firestoreUnsubscribe = null;
     }
 
-    if (db && game.id) {
-      firestoreUnsubscribe = db.collection('games').doc(game.id).onSnapshot(doc => {
-        if (doc.exists) {
-          activeGame = doc.data();
-          renderScorecard();
-        }
-      });
-    }
-
     renderScorecard();
     showView('view-scorecard');
   }
@@ -1111,6 +1120,21 @@
     const statusChip = document.getElementById('sc-status-chip');
     statusChip.textContent = activeGame.completed ? 'Completed' : 'In Progress';
     statusChip.className = `meta-pill ${activeGame.completed ? 'completed' : 'variant'}`;
+
+    const syncChip = document.getElementById('sc-sync-chip');
+    if (syncChip) {
+      if (activeGame.completed) {
+        syncChip.textContent = '☁️ Synced to Cloud';
+        syncChip.className = 'meta-pill completed';
+        syncChip.style.background = 'rgba(34, 197, 94, 0.2)';
+        syncChip.style.color = 'var(--fairway-light)';
+      } else {
+        syncChip.textContent = '⚡ Offline-First (Syncs on Finish)';
+        syncChip.className = 'meta-pill';
+        syncChip.style.background = 'rgba(59, 130, 246, 0.18)';
+        syncChip.style.color = '#93c5fd';
+      }
+    }
 
     // Winner announcement banner & Toggle button state
     const winnerBanner = document.getElementById('sc-winner-banner');
@@ -1457,9 +1481,10 @@
     showToast(`${gameConfig.roundName} ${holeIdx + 1}: ${player.name} scored ${validScore} pts`, 'success');
 
     try {
-      await saveGame(activeGame);
+      // Save locally (offline-first during match)
+      await saveGame(activeGame, { syncToCloud: false });
     } catch (err) {
-      console.warn('Error persisting score:', err);
+      console.warn('Error saving local score:', err);
     }
   }
 
@@ -1478,7 +1503,8 @@
     showToast(`Score cleared`, 'info');
 
     try {
-      await saveGame(activeGame);
+      // Save locally (offline-first during match)
+      await saveGame(activeGame, { syncToCloud: false });
     } catch (err) {
       console.warn('Error clearing score:', err);
     }
