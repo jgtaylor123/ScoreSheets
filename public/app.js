@@ -1483,16 +1483,27 @@
       if (!auth) {
         showToast('Firebase Auth is ready once hosted on Firebase!', 'info');
         authModal.classList.remove('is-open');
+        closeSignInModal();
         return;
       }
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
         await auth.signInWithPopup(provider);
         authModal.classList.remove('is-open');
+        closeSignInModal();
+        dismissSplashScreen();
         showToast('Signed in successfully!', 'success');
       } catch (err) {
-        console.error('Sign in error:', err);
-        showToast('Sign in error: ' + err.message, 'error');
+        console.error('Google sign-in error:', err);
+        if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+          try {
+            await auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+          } catch (e2) {
+            showToast('Sign in error: ' + err.message, 'error');
+          }
+        } else {
+          showToast('Sign in error: ' + err.message, 'error');
+        }
       }
     });
 
