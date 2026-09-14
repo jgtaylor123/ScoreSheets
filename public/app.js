@@ -177,17 +177,31 @@
     directScore: 0
   };
 
-  // Screen Wake Lock State (Prevents mobile devices from sleeping during gameplay)
+  // Screen Wake Lock State (Defaults to ON, persisted in localStorage, togglable)
+  const WAKE_LOCK_PREF_KEY = 'scoresheets_wake_lock_enabled';
+  let isWakeLockEnabled = (function() {
+    try {
+      const stored = localStorage.getItem(WAKE_LOCK_PREF_KEY);
+      return stored === null ? true : stored === 'true';
+    } catch (e) {
+      return true; // Default ON
+    }
+  })();
   let wakeLockSentinel = null;
-  let isWakeLockEnabled = true;
 
   async function requestWakeLock() {
     if (!('wakeLock' in navigator)) {
       updateWakeLockUI();
       return;
     }
-    if (!isWakeLockEnabled) return;
-    if (wakeLockSentinel && !wakeLockSentinel.released) return;
+    if (!isWakeLockEnabled) {
+      updateWakeLockUI();
+      return;
+    }
+    if (wakeLockSentinel && !wakeLockSentinel.released) {
+      updateWakeLockUI();
+      return;
+    }
 
     try {
       wakeLockSentinel = await navigator.wakeLock.request('screen');
@@ -208,8 +222,8 @@
         await wakeLockSentinel.release();
       } catch (e) {}
       wakeLockSentinel = null;
-      updateWakeLockUI();
     }
+    updateWakeLockUI();
   }
 
   async function toggleWakeLock() {
@@ -218,12 +232,16 @@
       return;
     }
     isWakeLockEnabled = !isWakeLockEnabled;
+    try {
+      localStorage.setItem(WAKE_LOCK_PREF_KEY, String(isWakeLockEnabled));
+    } catch (e) {}
+
     if (isWakeLockEnabled) {
       await requestWakeLock();
-      showToast('🔆 Screen will stay awake while score sheet is open', 'success');
+      showToast('🔆 Stay Awake: ON (Screen will not sleep)', 'success');
     } else {
       await releaseWakeLock();
-      showToast('💤 Auto-sleep restored (battery saver)', 'info');
+      showToast('💤 Stay Awake: OFF (Auto-sleep enabled)', 'info');
     }
     updateWakeLockUI();
   }
@@ -236,13 +254,16 @@
       return;
     }
     chip.style.display = 'inline-flex';
-    if (wakeLockSentinel && !wakeLockSentinel.released) {
+    if (isWakeLockEnabled) {
       chip.innerHTML = '🔆 Stay Awake: <strong style="margin-left:3px; color:#4ade80;">ON</strong>';
       chip.style.background = 'rgba(34, 197, 94, 0.2)';
       chip.style.color = '#ffffff';
       chip.style.borderColor = 'var(--fairway-green)';
       chip.style.boxShadow = '0 0 10px rgba(34, 197, 94, 0.35)';
       chip.title = 'Screen will stay awake while viewing this sheet. Tap to turn OFF.';
+      if (!wakeLockSentinel || wakeLockSentinel.released) {
+        requestWakeLock();
+      }
     } else {
       chip.innerHTML = '💤 Stay Awake: <strong style="margin-left:3px; color:#94a3b8;">OFF</strong>';
       chip.style.background = 'rgba(255, 255, 255, 0.06)';
@@ -2439,6 +2460,15 @@
         requestWakeLock();
       }
     });
+
+    // Acquire on first touch/interaction on mobile devices if user has stay awake enabled
+    const onFirstUserInteraction = () => {
+      if (isWakeLockEnabled) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('touchstart', onFirstUserInteraction, { passive: true });
+    document.addEventListener('click', onFirstUserInteraction, { passive: true });
 
     // Check URL parameters for direct game link: ?game=xyz
     const urlParams = new URLSearchParams(window.location.search);
