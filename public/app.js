@@ -308,14 +308,12 @@
       if (!auth) {
         auth = firebase.auth();
         
-        // Configure session persistence
+        // Use LOCAL persistence across all devices so auth state is not lost after Google redirect or reload
         try {
-          const isMobile = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || '');
-          const persistence = isMobile ? firebase.auth.Auth.Persistence.SESSION : firebase.auth.Auth.Persistence.LOCAL;
-          auth.setPersistence(persistence).catch(() => {});
+          auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
         } catch (e) {}
 
-        // Listen for Auth changes
+        // Listen for Auth state changes
         auth.onAuthStateChanged(user => {
           currentUser = user;
           updateAuthUI();
@@ -326,7 +324,7 @@
           loadGamesList();
         });
 
-        // Check for redirect result if redirect sign-in was used
+        // Process redirect results for Google sign-in (critical on iOS Safari)
         if (auth.getRedirectResult) {
           auth.getRedirectResult().then(result => {
             if (result && result.user) {
@@ -334,8 +332,16 @@
               updateAuthUI();
               closeSignInModal();
               dismissSplashScreen();
+              showToast('Signed in successfully!', 'success');
+            } else if (auth.currentUser) {
+              currentUser = auth.currentUser;
+              updateAuthUI();
+              closeSignInModal();
+              dismissSplashScreen();
             }
-          }).catch(() => {});
+          }).catch(err => {
+            console.error('getRedirectResult error:', err);
+          });
         }
       }
       if (!db) {
@@ -451,6 +457,10 @@
     }
 
     if (currentUser) {
+      // User is authenticated: immediately dismiss splash screen and modals
+      dismissSplashScreen();
+      closeSignInModal();
+
       const name = currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'My Profile');
       if (authActionBtn) {
         authActionBtn.textContent = '👤 ' + name;
