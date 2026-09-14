@@ -278,10 +278,6 @@
     if (modal) {
       modal.classList.add('is-open');
       modal.setAttribute('aria-hidden', 'false');
-      setTimeout(() => {
-        const emailInput = document.getElementById('email');
-        if (emailInput) emailInput.focus();
-      }, 50);
     }
   }
 
@@ -297,17 +293,33 @@
   // FIREBASE INITIALIZATION & SYNC
   // ==========================================================
 
+  const DEFAULT_FIREBASE_CONFIG = {
+    projectId: "gamescoresheets",
+    appId: "1:1083019961507:web:c33f49d8a1a3b675a88b16",
+    storageBucket: "gamescoresheets.firebasestorage.app",
+    apiKey: "AIzaSyBydI_r0DxTvzaRM3rapYirqczF9EDGavc",
+    authDomain: "gamescoresheets.firebaseapp.com",
+    messagingSenderId: "1083019961507",
+    measurementId: "G-3GFEX8MT3C"
+  };
+
   function initFirebase() {
     try {
-      if (window.firebase && firebase.apps.length === 0) {
-        if (window.firebaseConfig) {
-          firebase.initializeApp(window.firebaseConfig);
+      if (window.firebase) {
+        if (!firebase.apps.length) {
+          const config = window.firebaseConfig || DEFAULT_FIREBASE_CONFIG;
+          firebase.initializeApp(config);
         }
-      }
 
-      if (window.firebase && firebase.apps.length > 0) {
         auth = firebase.auth();
         db = firebase.firestore();
+
+        // Configure session persistence
+        try {
+          const isMobile = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || '');
+          const persistence = isMobile ? firebase.auth.Auth.Persistence.SESSION : firebase.auth.Auth.Persistence.LOCAL;
+          auth.setPersistence(persistence).catch(() => {});
+        } catch (e) {}
 
         // Enable offline persistence in Firestore SDK for robust offline operation
         try {
@@ -320,7 +332,6 @@
           currentUser = user;
           updateAuthUI();
           if (currentUser) {
-            // Dismiss splash on successful auth
             closeSignInModal();
             dismissSplashScreen();
           }
