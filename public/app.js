@@ -237,15 +237,19 @@
     }
     chip.style.display = 'inline-flex';
     if (wakeLockSentinel && !wakeLockSentinel.released) {
-      chip.innerHTML = '🔆 Screen Kept Awake';
-      chip.style.background = 'rgba(245, 158, 11, 0.22)';
-      chip.style.color = 'var(--accent-gold)';
-      chip.style.borderColor = 'var(--accent-gold)';
+      chip.innerHTML = '🔆 Stay Awake: <strong style="margin-left:3px; color:#4ade80;">ON</strong>';
+      chip.style.background = 'rgba(34, 197, 94, 0.2)';
+      chip.style.color = '#ffffff';
+      chip.style.borderColor = 'var(--fairway-green)';
+      chip.style.boxShadow = '0 0 10px rgba(34, 197, 94, 0.35)';
+      chip.title = 'Screen will stay awake while viewing this sheet. Tap to turn OFF.';
     } else {
-      chip.innerHTML = '💤 Auto-Sleep Allowed';
-      chip.style.background = 'rgba(255, 255, 255, 0.08)';
+      chip.innerHTML = '💤 Stay Awake: <strong style="margin-left:3px; color:#94a3b8;">OFF</strong>';
+      chip.style.background = 'rgba(255, 255, 255, 0.06)';
       chip.style.color = 'var(--text-muted)';
-      chip.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+      chip.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+      chip.style.boxShadow = 'none';
+      chip.title = 'Phone will auto-sleep normally. Tap to turn ON.';
     }
   }
 
