@@ -177,6 +177,78 @@
     directScore: 0
   };
 
+  // Screen Wake Lock State (Prevents mobile devices from sleeping during gameplay)
+  let wakeLockSentinel = null;
+  let isWakeLockEnabled = true;
+
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) {
+      updateWakeLockUI();
+      return;
+    }
+    if (!isWakeLockEnabled) return;
+    if (wakeLockSentinel && !wakeLockSentinel.released) return;
+
+    try {
+      wakeLockSentinel = await navigator.wakeLock.request('screen');
+      wakeLockSentinel.addEventListener('release', () => {
+        wakeLockSentinel = null;
+        updateWakeLockUI();
+      });
+      updateWakeLockUI();
+    } catch (err) {
+      console.warn('Screen Wake Lock request note:', err && err.message);
+      updateWakeLockUI();
+    }
+  }
+
+  async function releaseWakeLock() {
+    if (wakeLockSentinel) {
+      try {
+        await wakeLockSentinel.release();
+      } catch (e) {}
+      wakeLockSentinel = null;
+      updateWakeLockUI();
+    }
+  }
+
+  async function toggleWakeLock() {
+    if (!('wakeLock' in navigator)) {
+      showToast('Screen Wake Lock is not supported on this browser', 'info');
+      return;
+    }
+    isWakeLockEnabled = !isWakeLockEnabled;
+    if (isWakeLockEnabled) {
+      await requestWakeLock();
+      showToast('🔆 Screen will stay awake while score sheet is open', 'success');
+    } else {
+      await releaseWakeLock();
+      showToast('💤 Auto-sleep restored (battery saver)', 'info');
+    }
+    updateWakeLockUI();
+  }
+
+  function updateWakeLockUI() {
+    const chip = document.getElementById('btn-wakelock-chip');
+    if (!chip) return;
+    if (!('wakeLock' in navigator)) {
+      chip.style.display = 'none';
+      return;
+    }
+    chip.style.display = 'inline-flex';
+    if (wakeLockSentinel && !wakeLockSentinel.released) {
+      chip.innerHTML = '🔆 Screen Kept Awake';
+      chip.style.background = 'rgba(245, 158, 11, 0.22)';
+      chip.style.color = 'var(--accent-gold)';
+      chip.style.borderColor = 'var(--accent-gold)';
+    } else {
+      chip.innerHTML = '💤 Auto-Sleep Allowed';
+      chip.style.background = 'rgba(255, 255, 255, 0.08)';
+      chip.style.color = 'var(--text-muted)';
+      chip.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+    }
+  }
+
   // ==========================================================
   // SPLASH SCREEN & AUTH MODAL LOGIC (Squares-Style)
   // ==========================================================
@@ -1413,6 +1485,7 @@
     dismissSplashScreen();
     renderScorecard();
     showView('view-scorecard');
+    requestWakeLock();
   }
 
   // Check if any player in the game has reached exactly 100 points
@@ -1485,6 +1558,7 @@
       }
     }
 
+    updateWakeLockUI();
     renderLeaderboardBar();
     renderScoreTable();
   }
@@ -2230,6 +2304,20 @@
         await auth.signOut();
         authModal.classList.remove('is-open');
         showToast('Signed out', 'info');
+      }
+    });
+
+    // Screen Wake Lock Toggle & Auto-Reacquire
+    const wakeLockChip = document.getElementById('btn-wakelock-chip');
+    if (wakeLockChip) {
+      wakeLockChip.addEventListener('click', () => {
+        toggleWakeLock();
+      });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && isWakeLockEnabled) {
+        requestWakeLock();
       }
     });
 
