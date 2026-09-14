@@ -1108,6 +1108,7 @@
       firestoreUnsubscribe = null;
     }
 
+    dismissSplashScreen();
     renderScorecard();
     showView('view-scorecard');
   }
@@ -1912,16 +1913,31 @@
     const urlParams = new URLSearchParams(window.location.search);
     const linkedGameId = urlParams.get('game');
     if (linkedGameId) {
-      setTimeout(async () => {
-        let game = gamesList.find(g => g.id === linkedGameId);
-        if (!game && db) {
+      const loadLinkedGame = async () => {
+        // 1. Check local storage first
+        let local = getLocalGames().find(g => g.id === linkedGameId);
+        if (local) {
+          openGame(local);
+        }
+
+        // 2. Fetch latest version from Firestore
+        if (db) {
           try {
             const doc = await db.collection('games').doc(linkedGameId).get();
-            if (doc.exists) game = doc.data();
-          } catch (e) {}
+            if (doc.exists) {
+              const cloudGame = doc.data();
+              saveLocalGames([cloudGame, ...getLocalGames().filter(g => g.id !== cloudGame.id)]);
+              openGame(cloudGame);
+            }
+          } catch (e) {
+            console.warn('Could not fetch linked game from Firestore:', e);
+          }
         }
-        if (game) openGame(game);
-      }, 500);
+      };
+
+      // Run immediately and after a short delay for DB init
+      loadLinkedGame();
+      setTimeout(loadLinkedGame, 600);
     }
   }
 
