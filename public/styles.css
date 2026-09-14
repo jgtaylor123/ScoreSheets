@@ -1784,31 +1784,121 @@ body.splash-active {
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
-  z-index: 999;
+  z-index: 999999;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  max-width: min(420px, 92vw);
+  pointer-events: none;
 }
 
 .toast {
-  background: var(--bg-surface);
+  background: linear-gradient(135deg, var(--bg-surface), var(--bg-secondary));
   border: 1px solid var(--border-fairway);
-  box-shadow: var(--shadow-lg);
-  padding: 0.75rem 1.25rem;
-  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 0.9rem;
-  animation: slideUp 0.25s ease-out;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  pointer-events: auto;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .toast.toast-success {
   border-color: var(--fairway-green);
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.25);
+}
+
+.toast.toast-winner {
+  border-color: var(--accent-gold);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), var(--bg-surface));
+  box-shadow: 0 12px 36px rgba(245, 158, 11, 0.35);
 }
 
 .toast.toast-error {
   border-color: var(--danger);
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.25);
+}
+
+/* Winner Banner Card */
+.winner-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(34, 197, 94, 0.15));
+  border: 2px solid var(--accent-gold);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.25);
+  animation: winnerDrop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes winnerDrop {
+  from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.winner-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.winner-trophy-large {
+  font-size: 2.75rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.5));
+  animation: bounceTrophy 2s infinite ease-in-out;
+}
+
+@keyframes bounceTrophy {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.winner-banner-text .winner-kicker {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--accent-gold);
+  margin-bottom: 0.2rem;
+}
+
+.winner-banner-text h3 {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0;
+}
+
+.winner-banner-text h3 strong {
+  color: #fde047;
+  font-size: 1.45rem;
+}
+
+.winner-banner-text p {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-top: 0.25rem;
+}
+
+/* Cell Pulse Animation for Instant Save Feedback */
+@keyframes cellPulse {
+  0% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.8); background: rgba(34, 197, 94, 0.4); }
+  50% { transform: scale(1.08); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); background: rgba(34, 197, 94, 0.3); border-color: var(--fairway-light); }
+  100% { transform: scale(1); box-shadow: none; }
+}
+
+.cell-pulse {
+  animation: cellPulse 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 @keyframes slideUp {

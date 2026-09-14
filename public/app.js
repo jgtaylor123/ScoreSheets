@@ -618,8 +618,84 @@
     showToast(`${gameConfig.name} match created! 🎲`, 'success');
   }
 
+  // ==========================================================
+  // WINNER EVALUATION & RECORDING
+  // ==========================================================
+
+  function getGameWinner(game) {
+    if (!game || !game.players || game.players.length === 0) {
+      return { name: 'Player', totalScore: 0, id: '', is100PointWin: false, tally: [] };
+    }
+    const gType = game.gameType || 'golf';
+    const playerStats = game.players.map((p, origIdx) => {
+      const sum = p.scores.reduce((acc, s) => s !== null && s !== undefined ? acc + s : acc, 0);
+      const playedCount = p.scores.filter(s => s !== null && s !== undefined).length;
+      return { id: p.id, name: p.name, sum, totalScore: sum, playedCount, origIdx };
+    });
+
+    sortPlayerStats(playerStats, gType, game.scoreType);
+    const top = playerStats[0] || { name: 'Player', sum: 0, totalScore: 0, id: '' };
+    const is100PointWin = gType === 'golf' && top.sum === 100 && top.playedCount > 0;
+
+    return {
+      name: top.name,
+      totalScore: top.sum,
+      id: top.id,
+      is100PointWin: is100PointWin,
+      tally: playerStats
+    };
+  }
+
+  async function toggleMatchCompletion(game) {
+    if (!game) return;
+    const willBeCompleted = !game.completed;
+    game.completed = willBeCompleted;
+
+    if (willBeCompleted) {
+      const winner = getGameWinner(game);
+      triggerConfetti();
+      showToast(`🏆 And the winner is... ${winner.name} (${winner.totalScore} pts)! Match recorded.`, 'winner');
+    } else {
+      showToast(`▶️ Match resumed! Scores are open for updating.`, 'info');
+    }
+
+    if (activeGame && activeGame.id === game.id) {
+      renderScorecard();
+    }
+    loadGamesList();
+
+    try {
+      await saveGame(game);
+    } catch (err) {
+      console.warn('Error saving match state:', err);
+    }
+  }
+
   async function saveGame(game) {
     game.updatedAt = new Date().toISOString();
+
+    // Compute and record final tally & winner for posterity when marked complete
+    if (game.completed) {
+      const winnerInfo = getGameWinner(game);
+      game.winner = {
+        name: winnerInfo.name,
+        totalScore: winnerInfo.totalScore,
+        id: winnerInfo.id,
+        is100PointWin: winnerInfo.is100PointWin
+      };
+      game.finalTally = winnerInfo.tally.map(t => ({
+        id: t.id,
+        name: t.name,
+        totalScore: t.totalScore,
+        playedCount: t.playedCount
+      }));
+      game.completedAt = game.completedAt || new Date().toISOString();
+      game.lastFinalizedAt = new Date().toISOString();
+    } else {
+      game.winner = null;
+      game.finalTally = null;
+      game.lastResumedAt = new Date().toISOString();
+    }
 
     let localGames = getLocalGames();
     const existingIdx = localGames.findIndex(g => g.id === game.id);
@@ -634,17 +710,23 @@
       try {
         await db.collection('games').doc(game.id).set(game, { merge: true });
         if (currentUser) {
+          const userDocData = {
+            id: game.id,
+            gameType: game.gameType || 'golf',
+            title: game.title,
+            variant: game.variant,
+            holes: game.holes,
+            completed: game.completed,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          if (game.completed && game.winner) {
+            userDocData.winner = game.winner;
+            userDocData.finalTally = game.finalTally;
+            userDocData.completedAt = game.completedAt;
+          }
           await db.collection('users').doc(currentUser.uid)
             .collection('savedGames').doc(game.id)
-            .set({
-              id: game.id,
-              gameType: game.gameType || 'golf',
-              title: game.title,
-              variant: game.variant,
-              holes: game.holes,
-              completed: game.completed,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+            .set(userDocData, { merge: true });
         }
       } catch (err) {
         console.warn('Firestore sync warning:', err);
@@ -962,21 +1044,7 @@
         const gId = btn.getAttribute('data-game-id');
         const found = gamesList.find(g => g.id === gId);
         if (found) {
-          found.completed = !found.completed;
-          await saveGame(found);
-          loadGamesList();
-          if (found.completed) {
-            const isGolf = (found.gameType || 'golf') === 'golf';
-            const has100 = isGolf && hasPlayerWith100Points(found);
-            if (has100) {
-              triggerConfetti();
-              showToast('🏆 100 POINTS ULTIMATE WINNER! Confetti dropped! 🎉', 'success');
-            } else {
-              showToast('Match marked as completed', 'info');
-            }
-          } else {
-            showToast('Match reopened', 'info');
-          }
+          await toggleMatchCompletion(found);
         }
       });
     });
@@ -1043,6 +1111,31 @@
     const statusChip = document.getElementById('sc-status-chip');
     statusChip.textContent = activeGame.completed ? 'Completed' : 'In Progress';
     statusChip.className = `meta-pill ${activeGame.completed ? 'completed' : 'variant'}`;
+
+    // Winner announcement banner & Toggle button state
+    const winnerBanner = document.getElementById('sc-winner-banner');
+    const winnerNameEl = document.getElementById('sc-winner-name');
+    const winnerSubEl = document.getElementById('sc-winner-sub');
+    const toggleCompleteBtn = document.getElementById('btn-finish-game-toggle');
+
+    if (activeGame.completed) {
+      const winner = getGameWinner(activeGame);
+      if (winnerBanner && winnerNameEl && winnerSubEl) {
+        winnerBanner.classList.remove('hidden');
+        winnerNameEl.textContent = winner.name;
+        winnerSubEl.textContent = `Final Score: ${winner.totalScore} pts ${winner.is100PointWin ? '🎯 (100 PTS ULTIMATE WIN!)' : ''} • Match recorded to database for posterity.`;
+      }
+      if (toggleCompleteBtn) {
+        toggleCompleteBtn.innerHTML = '▶️ Resume Match';
+        toggleCompleteBtn.className = 'btn btn-outline btn-sm';
+      }
+    } else {
+      if (winnerBanner) winnerBanner.classList.add('hidden');
+      if (toggleCompleteBtn) {
+        toggleCompleteBtn.innerHTML = '🏁 Finalize &amp; Record Match';
+        toggleCompleteBtn.className = 'btn btn-gold btn-sm';
+      }
+    }
 
     renderLeaderboardBar();
     renderScoreTable();
@@ -1334,28 +1427,60 @@
     document.getElementById('modal-score-input').classList.remove('is-open');
   }
 
+  function highlightScoreCell(playerId, holeIdx) {
+    const cellBtn = document.querySelector(`.score-cell-btn[data-player-id="${playerId}"][data-hole-idx="${holeIdx}"]`);
+    if (cellBtn) {
+      cellBtn.classList.remove('cell-pulse');
+      void cellBtn.offsetWidth; // trigger reflow
+      cellBtn.classList.add('cell-pulse');
+    }
+  }
+
   async function saveScoreFromModal() {
     const player = activeGame.players.find(p => p.id === editingScoreCtx.playerId);
-    if (player) {
-      const gType = activeGame.gameType || 'golf';
-      const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
-
-      player.scores[editingScoreCtx.holeIdx] = editingScoreCtx.directScore;
-      await saveGame(activeGame);
-      renderScorecard();
+    if (!player) {
       closeScoreModal();
-      showToast(`${gameConfig.roundName} ${editingScoreCtx.holeIdx + 1} score (${editingScoreCtx.directScore} pts) saved for ${player.name}`, 'success');
+      return;
+    }
+    const gType = activeGame.gameType || 'golf';
+    const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
+    const scoreVal = parseInt(editingScoreCtx.directScore, 10);
+    const validScore = isNaN(scoreVal) ? 0 : scoreVal;
+    const holeIdx = editingScoreCtx.holeIdx;
+
+    player.scores[holeIdx] = validScore;
+
+    // Immediately close modal and update scorecard
+    closeScoreModal();
+    renderScorecard();
+    highlightScoreCell(player.id, holeIdx);
+    showToast(`${gameConfig.roundName} ${holeIdx + 1}: ${player.name} scored ${validScore} pts`, 'success');
+
+    try {
+      await saveGame(activeGame);
+    } catch (err) {
+      console.warn('Error persisting score:', err);
     }
   }
 
   async function clearScoreFromModal() {
     const player = activeGame.players.find(p => p.id === editingScoreCtx.playerId);
-    if (player) {
-      player.scores[editingScoreCtx.holeIdx] = null;
-      await saveGame(activeGame);
-      renderScorecard();
+    if (!player) {
       closeScoreModal();
-      showToast(`Score cleared`, 'success');
+      return;
+    }
+    const holeIdx = editingScoreCtx.holeIdx;
+    player.scores[holeIdx] = null;
+
+    closeScoreModal();
+    renderScorecard();
+    highlightScoreCell(player.id, holeIdx);
+    showToast(`Score cleared`, 'info');
+
+    try {
+      await saveGame(activeGame);
+    } catch (err) {
+      console.warn('Error clearing score:', err);
     }
   }
 
@@ -1631,24 +1756,17 @@
     });
 
     document.getElementById('btn-finish-game-toggle').addEventListener('click', async () => {
-      if (!activeGame) return;
-      activeGame.completed = !activeGame.completed;
-      await saveGame(activeGame);
-      renderScorecard();
-
-      if (activeGame.completed) {
-        const isGolf = (activeGame.gameType || 'golf') === 'golf';
-        const has100 = isGolf && hasPlayerWith100Points(activeGame);
-        if (has100) {
-          triggerConfetti();
-          showToast('🏆 100 POINTS ULTIMATE WINNER! Confetti dropped! 🎉', 'success');
-        } else {
-          showToast('Match marked as completed! 🏆', 'success');
-        }
-      } else {
-        showToast('Match in progress', 'info');
+      if (activeGame) {
+        await toggleMatchCompletion(activeGame);
       }
     });
+
+    const winnerConfettiBtn = document.getElementById('btn-winner-confetti');
+    if (winnerConfettiBtn) {
+      winnerConfettiBtn.addEventListener('click', () => {
+        triggerConfetti();
+      });
+    }
 
     // Score Modal Actions
     document.getElementById('btn-close-score-modal').addEventListener('click', closeScoreModal);

@@ -301,6 +301,21 @@
           </div>
         </div>
 
+        <!-- Official Winner Announcement Banner (Visible when Match is Completed) -->
+        <div id="sc-winner-banner" class="winner-banner hidden">
+          <div class="winner-banner-left">
+            <div class="winner-trophy-large">🏆</div>
+            <div class="winner-banner-text">
+              <div class="winner-kicker">Official Result &bull; Match Finalized</div>
+              <h3 id="sc-winner-announcement">And the winner is... <strong id="sc-winner-name">Player</strong>!</h3>
+              <p id="sc-winner-sub">Final tally recorded to cloud database.</p>
+            </div>
+          </div>
+          <div>
+            <button type="button" class="btn btn-gold btn-sm" id="btn-winner-confetti" title="Celebrate Again!">🎉 Celebrate</button>
+          </div>
+        </div>
+
         <!-- Live Leaderboard Podium Bar -->
         <div class="leaderboard-bar" id="sc-leaderboard-bar">
           <!-- Populated dynamically -->
@@ -511,7 +526,7 @@
     <script src="/__/firebase/init.js"></script>
 
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=6"></script>
+    <script src="/app.js?v=7"></script>
   </body>
 </html>
 
