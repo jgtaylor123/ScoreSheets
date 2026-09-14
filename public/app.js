@@ -714,6 +714,38 @@
     }
   }
 
+  async function startRematch(game) {
+    if (!game) return;
+    const gameConfig = GAMES_REGISTRY[game.gameType || 'golf'] || GAMES_REGISTRY.golf;
+    const holes = game.holes || gameConfig.defaultRounds;
+
+    const newPlayers = game.players.map((p, i) => ({
+      id: 'p_' + Date.now() + '_' + i,
+      name: p.name,
+      scores: Array(holes).fill(null),
+      cardDetails: Array(holes).fill(null)
+    }));
+
+    const newGameData = {
+      id: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
+      gameType: game.gameType || 'golf',
+      title: game.title,
+      variant: game.variant !== undefined ? game.variant : gameConfig.defaultVariant,
+      holes: holes,
+      scoreType: game.scoreType || gameConfig.scoreType,
+      players: newPlayers,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: currentUser ? currentUser.uid : 'anonymous'
+    };
+
+    saveLastPlayerNames(newPlayers.map(p => p.name));
+    await saveGame(newGameData, { syncToCloud: true });
+    openGame(newGameData);
+    showToast(`Rematch created for ${newGameData.title}! 🔄`, 'success');
+  }
+
   async function deleteGame(gameId) {
     if (!confirm('Are you sure you want to delete this scorecard?')) return;
 
@@ -856,8 +888,9 @@
             <span>${leaderText}</span>
           </div>
           <div class="game-item-actions">
-            <button type="button" class="btn btn-primary btn-sm btn-open-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Open ScoreSheet</button>
-            <button type="button" class="btn btn-outline btn-sm btn-delete-card" data-game-id="${escapeHtml(game.id)}">🗑️</button>
+            <button type="button" class="btn btn-primary btn-sm btn-open-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Open Sheet</button>
+            <button type="button" class="btn btn-gold btn-sm btn-rematch-game" data-game-id="${escapeHtml(game.id)}" title="Start a rematch with the same players and settings">🔄 Rematch</button>
+            <button type="button" class="btn btn-outline btn-sm btn-delete-card" data-game-id="${escapeHtml(game.id)}" title="Delete Sheet">🗑️</button>
           </div>
         </div>
       `;
@@ -868,6 +901,14 @@
         const gId = btn.getAttribute('data-game-id');
         const found = gamesList.find(g => g.id === gId);
         if (found) openGame(found);
+      });
+    });
+
+    listContainer.querySelectorAll('.btn-rematch-game').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gId = btn.getAttribute('data-game-id');
+        const found = gamesList.find(g => g.id === gId);
+        if (found) startRematch(found);
       });
     });
 
@@ -956,7 +997,8 @@
             <span>${leaderText}</span>
           </div>
           <div class="game-item-actions">
-            <button type="button" class="btn btn-primary btn-sm btn-open-active-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Resume Match ➔</button>
+            <button type="button" class="btn btn-primary btn-sm btn-open-active-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Open Sheet</button>
+            <button type="button" class="btn btn-gold btn-sm btn-rematch-active-game" data-game-id="${escapeHtml(game.id)}" title="Start a rematch with the same players and settings">🔄 Rematch</button>
           </div>
         </div>
       `;
@@ -967,6 +1009,14 @@
         const gId = btn.getAttribute('data-game-id');
         const found = gamesList.find(g => g.id === gId);
         if (found) openGame(found);
+      });
+    });
+
+    grid.querySelectorAll('.btn-rematch-active-game').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gId = btn.getAttribute('data-game-id');
+        const found = gamesList.find(g => g.id === gId);
+        if (found) startRematch(found);
       });
     });
   }
@@ -1003,6 +1053,7 @@
           <td style="text-align: right;">
             <div class="manage-actions-cell" style="justify-content: flex-end;">
               <button type="button" class="btn btn-primary btn-sm btn-manage-open" data-game-id="${escapeHtml(game.id)}">Open</button>
+              <button type="button" class="btn btn-gold btn-sm btn-manage-rematch" data-game-id="${escapeHtml(game.id)}" title="Start a rematch">🔄 Rematch</button>
               <button type="button" class="btn btn-outline btn-sm btn-manage-toggle" data-game-id="${escapeHtml(game.id)}" title="Toggle Status">${game.completed ? 'Reopen' : 'Finish'}</button>
               <button type="button" class="btn btn-danger btn-sm btn-manage-del" data-game-id="${escapeHtml(game.id)}" title="Delete">🗑️</button>
             </div>
@@ -1016,6 +1067,14 @@
         const gId = btn.getAttribute('data-game-id');
         const found = gamesList.find(g => g.id === gId);
         if (found) openGame(found);
+      });
+    });
+
+    tbody.querySelectorAll('.btn-manage-rematch').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gId = btn.getAttribute('data-game-id');
+        const found = gamesList.find(g => g.id === gId);
+        if (found) startRematch(found);
       });
     });
 
