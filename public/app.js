@@ -1999,14 +1999,6 @@
       });
     }
 
-    const modalGoogleSigninBtn = document.getElementById('modal-google-signin');
-    if (modalGoogleSigninBtn) {
-      modalGoogleSigninBtn.addEventListener('click', () => {
-        const btnGoogle = document.getElementById('btn-google-sign-in');
-        if (btnGoogle) btnGoogle.click();
-      });
-    }
-
     const guestEntryBtn = document.getElementById('btn-guest-entry');
     if (guestEntryBtn) {
       guestEntryBtn.addEventListener('click', () => {
@@ -2256,7 +2248,6 @@
     }
 
     // Auth & Profile Navigation Action
-    const authModal = document.getElementById('modal-auth');
     document.getElementById('btn-auth-action').addEventListener('click', () => {
       if (currentUser) {
         // Open dedicated Profile & Stats Page
@@ -2291,25 +2282,15 @@
       });
     }
 
-    document.getElementById('btn-close-auth-modal').addEventListener('click', () => {
-      authModal.classList.remove('is-open');
-    });
-
-    document.getElementById('btn-continue-guest').addEventListener('click', () => {
-      authModal.classList.remove('is-open');
-    });
-
-    document.getElementById('btn-google-sign-in').addEventListener('click', async () => {
+    const handleGoogleAuth = async () => {
       if (!auth) {
         showToast('Firebase Auth is ready once hosted on Firebase!', 'info');
-        authModal.classList.remove('is-open');
         closeSignInModal();
         return;
       }
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
         await auth.signInWithPopup(provider);
-        authModal.classList.remove('is-open');
         closeSignInModal();
         dismissSplashScreen();
         showToast('Signed in successfully!', 'success');
@@ -2325,7 +2306,12 @@
           showToast('Sign in error: ' + err.message, 'error');
         }
       }
-    });
+    };
+
+    const modalGoogleSigninBtn = document.getElementById('modal-google-signin');
+    if (modalGoogleSigninBtn) {
+      modalGoogleSigninBtn.addEventListener('click', handleGoogleAuth);
+    }
 
     document.getElementById('btn-sign-out').addEventListener('click', async () => {
       if (auth) {
