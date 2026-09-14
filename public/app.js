@@ -1884,15 +1884,26 @@
 
     player.scores[holeIdx] = validScore;
 
+    // If saving a score into a previously completed match, automatically make it active again
+    const wasCompleted = activeGame.completed;
+    if (wasCompleted) {
+      activeGame.completed = false;
+    }
+
     // Immediately close modal and update scorecard
     closeScoreModal();
     renderScorecard();
     highlightScoreCell(player.id, holeIdx);
-    showToast(`${gameConfig.roundName} ${holeIdx + 1}: ${player.name} scored ${validScore} pts`, 'success');
+    
+    if (wasCompleted) {
+      showToast(`${gameConfig.roundName} ${holeIdx + 1} updated! Match reactivated until finalized again.`, 'info');
+    } else {
+      showToast(`${gameConfig.roundName} ${holeIdx + 1}: ${player.name} scored ${validScore} pts`, 'success');
+    }
 
     try {
-      // Save locally (offline-first during match)
-      await saveGame(activeGame, { syncToCloud: false });
+      // Save locally (offline-first during match; if reactivated, sync state)
+      await saveGame(activeGame, { syncToCloud: wasCompleted });
     } catch (err) {
       console.warn('Error saving local score:', err);
     }
@@ -1907,14 +1918,25 @@
     const holeIdx = editingScoreCtx.holeIdx;
     player.scores[holeIdx] = null;
 
+    // If clearing a score in a previously completed match, automatically make it active again
+    const wasCompleted = activeGame.completed;
+    if (wasCompleted) {
+      activeGame.completed = false;
+    }
+
     closeScoreModal();
     renderScorecard();
     highlightScoreCell(player.id, holeIdx);
-    showToast(`Score cleared`, 'info');
+    
+    if (wasCompleted) {
+      showToast(`Score cleared! Match reactivated until finalized again.`, 'info');
+    } else {
+      showToast(`Score cleared`, 'info');
+    }
 
     try {
-      // Save locally (offline-first during match)
-      await saveGame(activeGame, { syncToCloud: false });
+      // Save locally (offline-first during match; if reactivated, sync state)
+      await saveGame(activeGame, { syncToCloud: wasCompleted });
     } catch (err) {
       console.warn('Error clearing score:', err);
     }
