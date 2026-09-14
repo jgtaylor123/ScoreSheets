@@ -293,26 +293,35 @@
   // FIREBASE INITIALIZATION & SYNC
   // ==========================================================
 
+  function ensureFirebaseServices() {
+    if (!window.firebase) return false;
+    try {
+      if (!firebase.apps.length) {
+        if (window.firebaseConfig) {
+          firebase.initializeApp(window.firebaseConfig);
+        } else {
+          try {
+            firebase.app();
+          } catch (e) {}
+        }
+      }
+      if (!auth) {
+        auth = firebase.auth();
+      }
+      if (!db) {
+        db = firebase.firestore();
+      }
+      return !!auth;
+    } catch (e) {
+      console.warn('ensureFirebaseServices error:', e);
+      return false;
+    }
+  }
+
   function initFirebase() {
     try {
       if (window.firebase) {
-        if (!firebase.apps.length) {
-          if (window.firebaseConfig) {
-            firebase.initializeApp(window.firebaseConfig);
-          } else {
-            // Hosting-provided init script automatically configures default app
-            try {
-              firebase.app();
-            } catch (e) {}
-          }
-        }
-
-        try {
-          auth = firebase.auth();
-          db = firebase.firestore();
-        } catch (e) {
-          console.warn('Firebase services not ready:', e);
-        }
+        ensureFirebaseServices();
 
         if (auth) {
           // Configure session persistence
@@ -2050,6 +2059,9 @@
           alert('Email and password are required.');
           return;
         }
+
+        ensureFirebaseServices();
+
         if (!auth) {
           showToast('Firebase Auth is ready once hosted on Firebase!', 'info');
           closeSignInModal();
@@ -2094,6 +2106,7 @@
           alert('Please enter your email in the field first.');
           return;
         }
+        ensureFirebaseServices();
         if (!auth) {
           alert('Authentication is active on the deployed URL.');
           return;
@@ -2303,6 +2316,8 @@
     }
 
     const handleGoogleAuth = async () => {
+      ensureFirebaseServices();
+
       if (!auth) {
         showToast('Firebase Auth is ready once hosted on Firebase!', 'info');
         closeSignInModal();
@@ -2310,6 +2325,9 @@
       }
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
+        provider.addScope('email');
+        provider.addScope('profile');
+        provider.setCustomParameters({ prompt: 'select_account' });
         await auth.signInWithPopup(provider);
         closeSignInModal();
         dismissSplashScreen();
@@ -2318,7 +2336,10 @@
         console.error('Google sign-in error:', err);
         if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
           try {
-            await auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+            await auth.signInWithRedirect(provider);
           } catch (e2) {
             showToast('Sign in error: ' + err.message, 'error');
           }
