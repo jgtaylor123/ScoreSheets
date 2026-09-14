@@ -17,11 +17,11 @@
       icon: '⛳',
       badge: 'Cards',
       featured: true,
-      scoreType: 'lowest', // lowest total score wins
-      scoreLabel: 'Lowest Score Wins',
+      scoreType: 'lowest', // lowest total score wins (unless someone scores exactly 100!)
+      scoreLabel: 'Lowest Score Wins (or 100-pt Shoot the Moon)',
       roundName: 'Hole',
       roundPlural: 'Holes',
-      description: 'Classic 4, 6, 8, or 9-card Golf. Lowest total points at the end of the match wins.',
+      description: 'Classic 4, 6, 8, or 9-card Golf. Lowest score wins — unless a player hits exactly 100 points for the ultimate win!',
       variants: [
         { id: 4, name: '4-Card Golf', desc: '2x2 Grid (Quick)', default: false },
         { id: 6, name: '6-Card Golf', desc: '2x3 Grid (Classic)', default: true },
@@ -575,6 +575,28 @@
     renderGamesList(games);
   }
 
+  // Sort rankings considering the special 100-points Golf rule
+  function sortPlayerStats(playerStats, gameType, scoreType) {
+    if (gameType === 'golf') {
+      playerStats.sort((a, b) => {
+        // Special Golf rule: Exactly 100 points wins over everything else!
+        const aHas100 = a.sum === 100 && a.playedCount > 0;
+        const bHas100 = b.sum === 100 && b.playedCount > 0;
+        if (aHas100 && !bHas100) return -1;
+        if (!aHas100 && bHas100) return 1;
+        // Otherwise lowest score wins
+        return a.sum - b.sum;
+      });
+    } else {
+      if (scoreType === 'lowest') {
+        playerStats.sort((a, b) => a.sum - b.sum);
+      } else {
+        playerStats.sort((a, b) => b.sum - a.sum);
+      }
+    }
+    return playerStats;
+  }
+
   function renderGamesList(games) {
     // 1. Render Active Open Sheets on Authenticated Home Screen
     renderActiveSheetsSection(games);
@@ -614,12 +636,10 @@
 
       const activePlayers = playerTotals.filter(p => p.playedCount > 0);
       if (activePlayers.length > 0) {
-        if (isLowestWins) {
-          activePlayers.sort((a, b) => a.sum - b.sum);
-        } else {
-          activePlayers.sort((a, b) => b.sum - a.sum);
-        }
-        leaderText = `Leader: <strong>${escapeHtml(activePlayers[0].name)} (${activePlayers[0].sum} pts)</strong>`;
+        sortPlayerStats(activePlayers, gType, game.scoreType);
+        const top = activePlayers[0];
+        const is100Win = gType === 'golf' && top.sum === 100;
+        leaderText = `${game.completed ? 'Winner' : 'Leader'}: <strong>${escapeHtml(top.name)} (${top.sum} pts${is100Win ? ' 🎯 100-PT WIN!' : ''})</strong>`;
       }
 
       const formattedDate = new Date(game.createdAt || Date.now()).toLocaleDateString(undefined, {
@@ -727,9 +747,10 @@
 
       const activePlayers = playerTotals.filter(p => p.playedCount > 0);
       if (activePlayers.length > 0) {
-        if (isLowestWins) activePlayers.sort((a, b) => a.sum - b.sum);
-        else activePlayers.sort((a, b) => b.sum - a.sum);
-        leaderText = `Current 1st: <strong>${escapeHtml(activePlayers[0].name)} (${activePlayers[0].sum} pts)</strong>`;
+        sortPlayerStats(activePlayers, gType, game.scoreType);
+        const top = activePlayers[0];
+        const is100Win = gType === 'golf' && top.sum === 100;
+        leaderText = `Current 1st: <strong>${escapeHtml(top.name)} (${top.sum} pts${is100Win ? ' 🎯 100!' : ''})</strong>`;
       }
 
       return `
@@ -818,7 +839,18 @@
           found.completed = !found.completed;
           await saveGame(found);
           loadGamesList();
-          showToast(found.completed ? 'Match marked as completed' : 'Match reopened', 'info');
+          if (found.completed) {
+            const isGolf = (found.gameType || 'golf') === 'golf';
+            const has100 = isGolf && hasPlayerWith100Points(found);
+            if (has100) {
+              triggerConfetti();
+              showToast('🏆 100 POINTS ULTIMATE WINNER! Confetti dropped! 🎉', 'success');
+            } else {
+              showToast('Match marked as completed', 'info');
+            }
+          } else {
+            showToast('Match reopened', 'info');
+          }
         }
       });
     });
@@ -856,18 +888,31 @@
     showView('view-scorecard');
   }
 
+  // Check if any player in the game has reached exactly 100 points
+  function hasPlayerWith100Points(game) {
+    if (!game || !game.players) return false;
+    return game.players.some(p => {
+      const sum = p.scores.reduce((acc, s) => s !== null && s !== undefined ? acc + s : acc, 0);
+      const playedCount = p.scores.filter(s => s !== null && s !== undefined).length;
+      return playedCount > 0 && sum === 100;
+    });
+  }
+
   function renderScorecard() {
     if (!activeGame) return;
 
     const gType = activeGame.gameType || 'golf';
     const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
     const isLowestWins = activeGame.scoreType === 'lowest';
+    const has100Winner = gType === 'golf' && hasPlayerWith100Points(activeGame);
 
     document.getElementById('sc-game-title').textContent = activeGame.title;
     document.getElementById('sc-game-type-chip').textContent = `${gameConfig.icon} ${gameConfig.name}`;
     document.getElementById('sc-variant-chip').textContent = typeof activeGame.variant === 'number' ? `${activeGame.variant}-Card` : `${activeGame.variant}`;
     document.getElementById('sc-holes-chip').textContent = `${activeGame.holes} ${gameConfig.roundPlural || 'Rounds'}`;
-    document.getElementById('sc-win-condition-chip').textContent = isLowestWins ? 'Lowest Wins ⛳' : 'Highest Wins 🏆';
+    document.getElementById('sc-win-condition-chip').textContent = has100Winner 
+      ? '🎯 100-PT WINNER!' 
+      : (isLowestWins ? 'Lowest Wins (or 100 pts) ⛳' : 'Highest Wins 🏆');
 
     const statusChip = document.getElementById('sc-status-chip');
     statusChip.textContent = activeGame.completed ? 'Completed' : 'In Progress';
@@ -889,19 +934,16 @@
       return { player: p, sum, playedCount, origIdx };
     });
 
-    if (isLowestWins) {
-      playerStats.sort((a, b) => a.sum - b.sum);
-    } else {
-      playerStats.sort((a, b) => b.sum - a.sum);
-    }
+    sortPlayerStats(playerStats, gType, activeGame.scoreType);
 
     bar.innerHTML = playerStats.map((item, rank) => {
       const isFirst = rank === 0 && item.playedCount > 0;
+      const is100Win = gType === 'golf' && item.sum === 100 && item.playedCount > 0;
       return `
-        <div class="leader-card ${isFirst ? 'rank-1' : ''}">
-          <div class="leader-rank">#${rank + 1}</div>
+        <div class="leader-card ${isFirst ? 'rank-1' : ''}" ${is100Win ? 'style="border-color: #fbbf24; box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);"' : ''}>
+          <div class="leader-rank">${is100Win ? '👑' : '#' + (rank + 1)}</div>
           <div class="leader-info">
-            <div class="leader-name">${escapeHtml(item.player.name)}</div>
+            <div class="leader-name">${escapeHtml(item.player.name)} ${is100Win ? '<span style="color:#fbbf24; font-size:0.75rem; font-weight:800;">(100 PTS!)</span>' : ''}</div>
             <div class="leader-sub">${item.playedCount}/${activeGame.holes} ${gameConfig.roundPlural.toLowerCase()}</div>
           </div>
           <div class="leader-score">${item.sum}</div>
@@ -973,9 +1015,170 @@
     });
   }
 
+  // Quick Score Presets
+  const GOLF_QUICK_SCORES = [-20, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  const GENERIC_QUICK_SCORES = [-10, -5, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 50, 100];
+
+  // ==========================================================
+  // CONFETTI CELEBRATION ENGINE
+  // ==========================================================
+
+  function triggerConfetti() {
+    const existingCanvas = document.getElementById('confetti-canvas');
+    if (existingCanvas) existingCanvas.remove();
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'confetti-canvas';
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '99999';
+    document.body.appendChild(canvas);
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+
+    const particles = [];
+    const colors = [
+      '#fbbf24', '#f59e0b', '#22c55e', '#10b981', '#4ade80',
+      '#ef4444', '#3b82f6', '#ec4899', '#a855f7', '#38bdf8', '#facc15'
+    ];
+
+    // Spawn 180 particles bursting from top and corners
+    for (let i = 0; i < 180; i++) {
+      const fromLeft = i % 2 === 0;
+      particles.push({
+        x: fromLeft ? window.innerWidth * (Math.random() * 0.4) : window.innerWidth * (0.6 + Math.random() * 0.4),
+        y: Math.random() * -100,
+        size: Math.random() * 10 + 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vx: fromLeft ? (Math.random() * 8 + 2) : -(Math.random() * 8 + 2),
+        vy: Math.random() * 7 + 3,
+        rotation: Math.random() * 360,
+        vRotation: (Math.random() - 0.5) * 16,
+        wobble: Math.random() * 10,
+        wobbleSpeed: Math.random() * 0.12 + 0.06,
+        opacity: 1,
+        shape: Math.random() > 0.4 ? 'rect' : 'circle'
+      });
+    }
+
+    let animationFrameId;
+    const startTime = Date.now();
+
+    function render() {
+      const elapsed = Date.now() - startTime;
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      let activeCount = 0;
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.16; // gravity
+        p.vx *= 0.985; // drag
+        p.rotation += p.vRotation;
+        p.wobble += p.wobbleSpeed;
+
+        if (elapsed > 2500) {
+          p.opacity = Math.max(0, p.opacity - 0.025);
+        }
+
+        if (p.y < window.innerHeight + 60 && p.opacity > 0) {
+          activeCount++;
+          ctx.save();
+          ctx.globalAlpha = p.opacity;
+          ctx.translate(p.x + Math.sin(p.wobble) * 6, p.y);
+          ctx.rotate((p.rotation * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+
+          if (p.shape === 'rect') {
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * (0.6 + Math.sin(p.wobble) * 0.4));
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+      });
+
+      if (activeCount > 0 && elapsed < 4500) {
+        animationFrameId = requestAnimationFrame(render);
+      } else {
+        cancelAnimationFrame(animationFrameId);
+        if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      }
+    }
+
+    animationFrameId = requestAnimationFrame(render);
+  }
+
   // ==========================================================
   // SCORE INPUT MODAL (DIRECT REPORTING)
   // ==========================================================
+
+  function setModalScore(scoreVal) {
+    editingScoreCtx.directScore = scoreVal;
+    const display = document.getElementById('direct-score-display');
+    if (display) display.textContent = editingScoreCtx.directScore;
+
+    // Highlight active button
+    document.querySelectorAll('.numpad-btn').forEach(btn => {
+      const val = parseInt(btn.getAttribute('data-val'), 10);
+      btn.classList.toggle('is-active-val', !isNaN(val) && val === scoreVal);
+    });
+
+    // If they select -20 drop confetti!
+    if (scoreVal === -20) {
+      triggerConfetti();
+      showToast('🏆 -20 JACKPOT! Confetti dropped! 🎉', 'success');
+    }
+  }
+
+  function renderScoreButtons(gameType, currentScore) {
+    const container = document.getElementById('modal-numpad-container');
+    if (!container) return;
+
+    const scoresList = gameType === 'golf' ? GOLF_QUICK_SCORES : GENERIC_QUICK_SCORES;
+
+    let html = scoresList.map(num => {
+      const isJackpot = num === -20;
+      const isNeg = num < 0;
+      const isSelected = num === currentScore;
+      let btnClass = 'numpad-btn';
+      if (isJackpot) btnClass += ' btn-jackpot';
+      else if (isNeg) btnClass += ' btn-negative';
+      if (isSelected) btnClass += ' is-active-val';
+
+      return `
+        <button type="button" class="${btnClass}" data-val="${num}" title="${isJackpot ? 'Super Jackpot (-20)!' : num + ' pts'}">
+          ${isJackpot ? '★ -20' : num}
+        </button>
+      `;
+    }).join('');
+
+    // Append CLR (Clear) button
+    html += `<button type="button" class="numpad-btn btn-clr" data-val="CLR">CLR</button>`;
+    container.innerHTML = html;
+
+    // Bind click events
+    container.querySelectorAll('.numpad-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-val');
+        if (val === 'CLR') {
+          setModalScore(0);
+        } else {
+          setModalScore(parseInt(val, 10));
+        }
+      });
+    });
+  }
 
   function openScoreModal(playerId, holeIdx) {
     const player = activeGame.players.find(p => p.id === playerId);
@@ -993,6 +1196,9 @@
     editingScoreCtx.directScore = existingScore !== null && existingScore !== undefined ? existingScore : 0;
     document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
     document.getElementById('input-direct-custom').value = '';
+
+    // Render quick buttons for this game type
+    renderScoreButtons(gType, editingScoreCtx.directScore);
 
     const modal = document.getElementById('modal-score-input');
     modal.classList.add('is-open');
@@ -1286,7 +1492,19 @@
       activeGame.completed = !activeGame.completed;
       await saveGame(activeGame);
       renderScorecard();
-      showToast(activeGame.completed ? 'Match marked as completed! 🏆' : 'Match in progress', 'success');
+
+      if (activeGame.completed) {
+        const isGolf = (activeGame.gameType || 'golf') === 'golf';
+        const has100 = isGolf && hasPlayerWith100Points(activeGame);
+        if (has100) {
+          triggerConfetti();
+          showToast('🏆 100 POINTS ULTIMATE WINNER! Confetti dropped! 🎉', 'success');
+        } else {
+          showToast('Match marked as completed! 🏆', 'success');
+        }
+      } else {
+        showToast('Match in progress', 'info');
+      }
     });
 
     // Score Modal Actions
@@ -1299,31 +1517,16 @@
     const btnScoreDec = document.getElementById('btn-score-dec');
     if (btnScoreDec) {
       btnScoreDec.addEventListener('click', () => {
-        editingScoreCtx.directScore -= 1;
-        document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
+        setModalScore(editingScoreCtx.directScore - 1);
       });
     }
 
     const btnScoreInc = document.getElementById('btn-score-inc');
     if (btnScoreInc) {
       btnScoreInc.addEventListener('click', () => {
-        editingScoreCtx.directScore += 1;
-        document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
+        setModalScore(editingScoreCtx.directScore + 1);
       });
     }
-
-    // Direct Quick Point Buttons
-    document.querySelectorAll('.numpad-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = btn.getAttribute('data-val');
-        if (val === 'CLR') {
-          editingScoreCtx.directScore = 0;
-        } else {
-          editingScoreCtx.directScore = parseInt(val, 10);
-        }
-        document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
-      });
-    });
 
     // Custom Direct Points Field
     const applyCustomBtn = document.getElementById('btn-apply-custom-direct');
@@ -1332,8 +1535,7 @@
         const input = document.getElementById('input-direct-custom');
         const val = parseInt(input.value, 10);
         if (!isNaN(val)) {
-          editingScoreCtx.directScore = val;
-          document.getElementById('direct-score-display').textContent = editingScoreCtx.directScore;
+          setModalScore(val);
           input.value = '';
         }
       });
