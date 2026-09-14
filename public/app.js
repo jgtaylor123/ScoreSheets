@@ -1119,17 +1119,21 @@
   }
 
   function renderGamesList(games) {
-    // 1. Render Active Open Sheets on Authenticated Home Screen
+    // 1. Render Active Open Sheets on Authenticated Home Screen (In Progress only)
     renderActiveSheetsSection(games);
 
-    // 2. Render General Match History
+    // 2. Render Match History: Shows completed games by default, or all games
     const listContainer = document.getElementById('games-list-container');
-    if (games.length === 0) {
+    const completedMatches = games.filter(g => g.completed);
+    // If user has no completed matches, show all matches so history isn't completely empty
+    const displayMatches = completedMatches.length > 0 ? completedMatches : games;
+
+    if (displayMatches.length === 0) {
       listContainer.innerHTML = `
         <div class="empty-state" style="grid-column: 1/-1;">
           <div class="empty-state-icon">📝</div>
-          <h4>No Matches Played Yet</h4>
-          <p>Choose an available ScoreSheet above to start tracking your next game.</p>
+          <h4>No Completed Matches Yet</h4>
+          <p>Finalize an open match to archive it in your permanent match history.</p>
           <button type="button" class="btn btn-primary btn-sm" id="btn-empty-new-game" style="margin-top: 1rem;">
             ➕ Start First Match
           </button>
@@ -1143,7 +1147,7 @@
       return;
     }
 
-    listContainer.innerHTML = games.map(game => {
+    listContainer.innerHTML = displayMatches.map(game => {
       const gType = game.gameType || 'golf';
       const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
       const isLowestWins = game.scoreType === 'lowest';
@@ -1191,7 +1195,7 @@
           <div class="game-item-actions">
             <button type="button" class="btn btn-primary btn-sm btn-open-game" data-game-id="${escapeHtml(game.id)}" style="flex:1">Open Sheet</button>
             <button type="button" class="btn btn-gold btn-sm btn-rematch-game" data-game-id="${escapeHtml(game.id)}" title="Start a rematch with the same players and settings">🔄 Rematch</button>
-            <button type="button" class="btn btn-outline btn-sm btn-delete-card" data-game-id="${escapeHtml(game.id)}" title="Delete Sheet">🗑️</button>
+            <button type="button" class="btn btn-outline btn-sm btn-delete-card" data-game-id="${escapeHtml(game.id)}" title="Remove from Home">🗑️</button>
           </div>
         </div>
       `;
@@ -1238,20 +1242,17 @@
 
     section.classList.remove('hidden');
 
-    // Filter games
-    let filtered = games;
-    if (activeSheetsFilter === 'open') {
-      filtered = games.filter(g => !g.completed);
-    }
+    // Filter games: only show non-completed (active open) matches in this section
+    const openMatches = games.filter(g => !g.completed && g.completed !== true);
 
-    if (filtered.length === 0) {
+    if (openMatches.length === 0) {
       grid.innerHTML = `
         <div class="empty-state" style="grid-column: 1/-1; padding: 2rem 1.5rem;">
           <div class="empty-state-icon">⛳</div>
-          <h4>${activeSheetsFilter === 'open' ? 'No Open Matches In Progress' : 'No Saved Matches Found'}</h4>
-          <p>Start a new game sheet or view completed games in match history.</p>
+          <h4>No Open Matches In Progress</h4>
+          <p>All matches are finalized! Completed matches are archived below in Recent Match History.</p>
           <button type="button" class="btn btn-primary btn-sm" id="btn-active-new-sheet" style="margin-top: 0.75rem;">
-            ➕ Start Match
+            ➕ Start New Match
           </button>
         </div>
       `;
@@ -1263,7 +1264,7 @@
       return;
     }
 
-    grid.innerHTML = filtered.map(game => {
+    grid.innerHTML = openMatches.map(game => {
       const gType = game.gameType || 'golf';
       const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
       const isLowestWins = game.scoreType === 'lowest';
@@ -1997,17 +1998,6 @@
         }
       });
     }
-
-    // Active Sheets Filter Pills (Open vs All)
-    const filterPills = document.querySelectorAll('#active-sheets-filter .filter-pill');
-    filterPills.forEach(pill => {
-      pill.addEventListener('click', () => {
-        filterPills.forEach(p => p.classList.remove('is-active'));
-        pill.classList.add('is-active');
-        activeSheetsFilter = pill.getAttribute('data-filter') || 'open';
-        renderActiveSheetsSection(gamesList);
-      });
-    });
 
     // Manage Sheets Navigation & Actions
     const manageNavBtn = document.getElementById('btn-nav-manage-sheets');
