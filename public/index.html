@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#062e1c" />
     <meta name="description" content="ScoreSheets - Universal digital scorekeeper and match tracker for card, board, and tabletop games." />
     <title>ScoreSheets | Digital Scorekeeper</title>
-    
+
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="stylesheet" href="/styles.css?v=6" />
@@ -95,6 +95,22 @@
         </div>
       </div>
     </div>
+
+      <div id="auth-debug-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-debug-title">
+        <div class="modal-dialog" style="max-width: 520px;">
+          <div class="modal-header">
+            <h3 id="auth-debug-title">Signed In Successfully</h3>
+            <button type="button" class="btn btn-outline btn-sm btn-icon" id="btn-close-auth-debug" aria-label="Close">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="live-board-status">Firebase confirmed your authentication session.</p>
+            <dl class="auth-debug-list" id="auth-debug-details"></dl>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="btn-auth-debug-continue">Continue</button>
+          </div>
+        </div>
+      </div>
 
     <!-- Top Global Header -->
     <header class="header">
@@ -203,6 +219,12 @@
             <div class="form-group">
               <label class="form-label" for="input-game-title">Match Title / Group Name</label>
               <input type="text" id="input-game-title" class="form-input" placeholder="e.g. Friday Game Night" required />
+            </div>
+
+            <div class="form-group hidden" id="setup-live-challenge-group">
+              <label class="form-label" for="input-challenge-email">Live Challenge Email</label>
+              <input type="email" id="input-challenge-email" class="form-input" placeholder="opponent@example.com" />
+              <p class="form-help">Send this Golf card game to a registered ScoreSheets player. They will see it in their profile.</p>
             </div>
 
             <!-- Variant Selection Container (Dynamic per game) -->
@@ -317,6 +339,18 @@
           </div>
         </div>
 
+        <section class="live-card-board hidden" id="live-card-board">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">Live Golf Board</p>
+              <h3 class="section-title">Your Card Layout</h3>
+            </div>
+            <span class="meta-pill completed">● Live</span>
+          </div>
+          <p class="live-board-status" id="live-board-status">Waiting for the other player...</p>
+          <div id="live-card-board-grid"></div>
+        </section>
+
         <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 0.75rem;">
           <button type="button" class="btn btn-outline btn-sm" id="btn-finish-game-toggle">
             🏁 Toggle Match Completion
@@ -424,14 +458,21 @@
             </ul>
           </div>
 
-          <!-- Crib (Pub 5-Card) Rules -->
+          <!-- Crib (5x5 Grid Game) Rules -->
           <div class="rule-card">
-            <h3>🪙 Crib (5-Card Pub Rules)</h3>
-            <p>Fast-paced traditional 5-card pub variant of Cribbage (race to 61 points).</p>
-            <ul style="margin-left: 1.25rem; margin-top: 0.5rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.875rem;">
-              <li><strong>Hand Size:</strong> Players are dealt 5 cards and discard 1 card into the dealer's crib.</li>
-              <li><strong>Non-Dealer Compensation:</strong> Non-dealer starts with <strong>3 points</strong> (3 holes) pegged before play begins.</li>
-              <li><strong>Flush in 5-Card:</strong> All 3 cards kept in hand must match suit (3 pts), plus 1 pt if cut card matches.</li>
+            <h3>🪙 Crib (5×5 Grid Board Game)</h3>
+            <p>Fast-paced 2-player strategic board &amp; card game combining cribbage hands in a 5×5 grid.</p>
+            <ul style="margin-left: 1.25rem; margin-top: 0.5rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 0.45rem; font-size: 0.875rem;">
+              <li><strong>Deal &amp; Setup:</strong> Players are dealt <strong>12 cards each</strong>. The remaining deck sits unturned in the center of the board.</li>
+              <li><strong>Communal Center Card:</strong> The top card of the center deck is turned face-up and serves as a shared communal starter card for both players.</li>
+              <li><strong>Grid Placement:</strong> Players take turns placing one card face-up into the <strong>5×5 grid</strong> around the center card until all 25 grid slots are filled.</li>
+              <li><strong>Row vs Column Scoring:</strong>
+                <ul style="margin-left: 1rem; margin-top: 0.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                  <li><strong>Player 1 (Across):</strong> Scores the 5 horizontal rows (left-to-right / right-to-left) as standard Cribbage hands (15s, pairs, runs, double runs, flushes).</li>
+                  <li><strong>Player 2 (Down):</strong> Scores the 5 vertical columns (top-to-bottom) as standard Cribbage hands.</li>
+                </ul>
+              </li>
+              <li><strong>Win Condition:</strong> <strong>First player to 100 points wins</strong>, regardless of the number of rounds (matches are typically completed in under 8 rounds)!</li>
             </ul>
           </div>
 
@@ -464,6 +505,15 @@
               <button type="button" class="btn btn-outline btn-sm" id="btn-profile-back">← Back to Home</button>
             </div>
           </div>
+
+          <section class="live-challenges-panel" id="profile-live-challenges" aria-live="polite">
+            <div class="section-header">
+              <h3 class="section-title">🚩 Live Game Challenges</h3>
+            </div>
+            <div id="profile-live-challenges-list">
+              <p class="empty-state-copy">Loading challenges...</p>
+            </div>
+          </section>
 
           <!-- Overall Summary Cards -->
           <div class="features-grid" style="margin-bottom: 2rem;">
@@ -573,6 +623,22 @@
       </div>
     </div>
 
+    <div id="modal-live-round-summary" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="live-round-summary-title">
+      <div class="modal-dialog" style="max-width: 520px;">
+        <div class="modal-header">
+          <h3 id="live-round-summary-title">Round Over</h3>
+        </div>
+        <div class="modal-body">
+          <p id="live-round-summary-subtitle" class="live-board-status">Both grids are revealed.</p>
+          <div class="live-round-results" id="live-round-results"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" id="btn-live-round-dismiss">Dismiss</button>
+          <button type="button" class="btn btn-primary" id="btn-live-round-ready">Ready for Next Hole</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Messages -->
     <div id="toast-container" class="toast-container"></div>
 
@@ -580,10 +646,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
-    <script src="/__/firebase/init.js"></script>
-
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=30"></script>
+    <script src="/app.js?v=77"></script>
   </body>
 </html>
 

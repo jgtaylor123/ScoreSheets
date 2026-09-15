@@ -112,25 +112,24 @@
       id: 'crib',
       name: 'Crib',
       icon: '🪙',
-      badge: 'Pub / Fast Card',
+      badge: '5x5 Grid Board',
       featured: true,
       scoreType: 'highest',
-      scoreLabel: 'Highest Score Wins',
-      roundName: 'Hand',
-      roundPlural: 'Hands',
-      description: 'Classic 5-card pub Cribbage. Fast-paced hand & crib scoring with rotating dealer.',
+      scoreLabel: 'First to 100 Points Wins',
+      roundName: 'Round',
+      roundPlural: 'Rounds',
+      description: '5×5 Grid Cribbage. 12 cards each + center cut card. One player scores rows (across), the other scores columns (top-to-bottom). First to 100 pts wins!',
       variants: [
-        { id: '5card', name: '5-Card Crib', desc: 'Traditional pub rules (1 to crib)', default: true },
-        { id: '6card', name: '6-Card Crib', desc: '2 cards discarded to crib', default: false },
-        { id: '3player', name: '3-Player Cutthroat', desc: '1 to crib + 1 from deck', default: false }
+        { id: 'standard', name: 'Standard (Rows vs Cols)', desc: 'Player 1 rows, Player 2 columns', default: true },
+        { id: '100pts', name: 'First to 100 pts', desc: 'Game ends as soon as 100 pts is reached', default: false }
       ],
       roundOptions: [
-        { count: 5, label: '5 Hands', desc: 'Quick Pub Game' },
-        { count: 7, label: '7 Hands', desc: 'Standard Match', default: true },
-        { count: 10, label: '10 Hands', desc: 'Full Match' }
+        { count: 6, label: '6 Rounds', desc: 'Short Match' },
+        { count: 8, label: '8 Rounds', desc: 'Standard Match (First to 100)', default: true },
+        { count: 10, label: '10 Rounds', desc: 'Extended Match' }
       ],
-      defaultVariant: '5card',
-      defaultRounds: 7
+      defaultVariant: 'standard',
+      defaultRounds: 8
     },
     generic_rounds: {
       id: 'generic_rounds',
@@ -164,7 +163,16 @@
   let gamesList = [];
   let db = null;
   let auth = null;
+  let authReady = Promise.resolve();
+  let redirectResultReady = Promise.resolve(null);
   let firestoreUnsubscribe = null;
+  let liveRefreshTimer = null;
+  let liveChallengesUnsubscribe = null;
+  let liveRoundModalKey = null;
+  let liveRoundDismissedKey = null;
+  let lastCornerWinKey = null;
+  let lastLiveGameWinKey = null;
+  let lastLiveTurnId = null;
   let activeSheetsFilter = 'open'; // 'open' | 'all'
 
   // Selected game in setup form
@@ -307,6 +315,31 @@
   }
 
   function closeSignInModal() {
+
+      function showAuthDebugDialog(user) {
+        if (!user) return;
+        const modal = document.getElementById('auth-debug-modal');
+        const details = document.getElementById('auth-debug-details');
+        if (!modal || !details) return;
+        const provider = user.providerData && user.providerData[0]
+          ? user.providerData[0].providerId
+          : 'password';
+        const rows = [
+          ['Email', user.email || 'Unavailable'],
+          ['Provider', provider],
+          ['Firebase UID', user.uid || 'Unavailable'],
+          ['Auth domain', firebase?.app?.().options?.authDomain || 'Unavailable'],
+          ['Browser', navigator.userAgent],
+          ['App origin', window.location.origin],
+          ['Session', firebase?.auth?.().currentUser ? 'Authenticated' : 'Not detected']
+        ];
+        details.innerHTML = rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
+        modal.classList.add('is-open');
+      }
+
+      function closeAuthDebugDialog() {
+        document.getElementById('auth-debug-modal')?.classList.remove('is-open');
+      }
     const modal = document.getElementById('signin-modal');
     if (modal) {
       modal.classList.remove('is-open');
@@ -332,42 +365,45 @@
       }
       if (!auth) {
         auth = firebase.auth();
-        
-        // Use LOCAL persistence across all devices so auth state is not lost after Google redirect or reload
+
+        // Configure persistence, then resolve the redirect result before allowing
+        // the initial signed-out auth event to update the UI.
+        let persistenceReady;
         try {
-          auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
-        } catch (e) {}
+          persistenceReady = auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        } catch (e) {
+          persistenceReady = Promise.resolve();
+        }
 
-        // Listen for Auth state changes
-        auth.onAuthStateChanged(user => {
-          currentUser = user;
-          updateAuthUI();
-          if (currentUser) {
-            closeSignInModal();
-            dismissSplashScreen();
+        authReady = Promise.resolve(persistenceReady).catch(() => {}).then(async () => {
+          let redirectUser = null;
+          try {
+            const result = auth.getRedirectResult ? await auth.getRedirectResult() : null;
+            redirectUser = result && result.user ? result.user : null;
+          } catch (err) {
+            console.error('Google redirect result error:', err);
+            showToast('Google sign-in could not be completed: ' + (err.message || err.code), 'error');
           }
-          loadGamesList();
-        });
+          redirectResultReady = Promise.resolve(redirectUser);
 
-        // Process redirect results for Google sign-in (critical on iOS Safari)
-        if (auth.getRedirectResult) {
-          auth.getRedirectResult().then(result => {
-            if (result && result.user) {
-              currentUser = result.user;
-              updateAuthUI();
-              closeSignInModal();
-              dismissSplashScreen();
-              showToast('Signed in successfully!', 'success');
-            } else if (auth.currentUser) {
-              currentUser = auth.currentUser;
-              updateAuthUI();
+          auth.onAuthStateChanged(user => {
+            currentUser = redirectUser || user || auth.currentUser;
+            updateAuthUI();
+            if (currentUser) {
               closeSignInModal();
               dismissSplashScreen();
             }
-          }).catch(err => {
-            console.error('getRedirectResult error:', err);
+            loadGamesList();
           });
-        }
+
+          if (redirectUser) {
+            currentUser = redirectUser;
+            updateAuthUI();
+            closeSignInModal();
+            dismissSplashScreen();
+            showToast('Signed in successfully!', 'success');
+          }
+        });
       }
       if (!db) {
         db = firebase.firestore();
@@ -681,6 +717,7 @@
     }
 
     showView('view-profile');
+    loadLiveChallenges();
   }
 
   // ==========================================================
@@ -813,6 +850,529 @@
     } catch (e) {}
   }
 
+  function normalizeEmail(email) {
+    return String(email || '').trim().toLowerCase();
+  }
+
+  function createGolfCardLayout(variant) {
+    return createLiveGolfState([{ id: 'pending-player' }], variant).boards['pending-player'];
+  }
+
+  function createGolfDeck() {
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const suits = ['♠', '♥', '♦', '♣'];
+    const deck = [];
+    ranks.forEach(rank => suits.forEach(suit => {
+      deck.push({ rank, suit, red: suit === '♥' || suit === '♦' });
+    }));
+    for (let index = deck.length - 1; index > 0; index--) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [deck[index], deck[swapIndex]] = [deck[swapIndex], deck[index]];
+    }
+    return deck;
+  }
+
+  function createLiveGolfState(playerIds, variant) {
+    const deck = createGolfDeck();
+    const boards = {};
+    playerIds.forEach(playerId => {
+      boards[playerId] = {
+        cards: deck.splice(0, 6),
+        revealed: Array(6).fill(false)
+      };
+    });
+    return {
+      roundIndex: 0,
+      phase: 'opening',
+      currentPlayerId: null,
+      openingReveals: {},
+      deck,
+      discardPile: [deck.pop()],
+      drawnCard: null,
+      boards
+    };
+  }
+
+  function ensureLiveGolfState(game) {
+    if (!game.liveState) {
+      game.liveState = createLiveGolfState((game.players || []).map(player => player.id), 6);
+    }
+    game.liveState.boards = game.liveState.boards || {};
+    game.liveState.openingReveals = game.liveState.openingReveals || {};
+    game.liveState.deck = game.liveState.deck || [];
+    game.liveState.discardPile = game.liveState.discardPile || [];
+    game.liveState.drawnCard = game.liveState.drawnCard || null;
+    (game.players || []).forEach(player => {
+      if (!game.liveState.boards[player.id] && game.liveState.deck.length >= 6) {
+        game.liveState.boards[player.id] = {
+          cards: game.liveState.deck.splice(0, 6),
+          revealed: Array(6).fill(false)
+        };
+      }
+    });
+  }
+
+  function getCurrentLivePlayer(game) {
+    if (!game || !currentUser || !Array.isArray(game.players)) return null;
+    return game.players.find(player => player.uid === currentUser.uid) || null;
+  }
+
+  function liveCardValue(card) {
+    if (!card) return 0;
+    if (card.rank === 'A') return 1;
+    if (card.rank === '2') return -2;
+    if (card.rank === 'K') return 0;
+    if (card.rank === 'J' || card.rank === 'Q') return 10;
+    return parseInt(card.rank, 10) || 0;
+  }
+
+  function liveBoardScore(board) {
+    if (!board || !board.cards) return 0;
+    let total = 0;
+    for (let column = 0; column < 3; column++) {
+      const top = board.cards[column];
+      const bottom = board.cards[column + 3];
+      if (top && bottom && top.rank === bottom.rank) continue;
+      total += liveCardValue(top) + liveCardValue(bottom);
+    }
+    return total;
+  }
+
+  function allLiveCardsRevealed(board) {
+    return !!board && Array.isArray(board.revealed) && board.revealed.every(Boolean);
+  }
+
+  function hasFourMatchingCorners(board) {
+    if (!board || !Array.isArray(board.cards) || board.cards.length < 6) return false;
+    const corners = [board.cards[0], board.cards[2], board.cards[3], board.cards[5]];
+    return corners.every(card => card && card.rank) && corners.every(card => card.rank === corners[0].rank);
+  }
+
+  async function updateLiveGame(mutator) {
+    if (!activeGame || !currentUser) return;
+    ensureLiveGolfState(activeGame);
+    const player = getCurrentLivePlayer(activeGame);
+    if (!player) return;
+    mutator(activeGame.liveState, player);
+    await saveGame(activeGame, { syncToCloud: true });
+    renderLiveCardBoard();
+  }
+
+  async function readyForNextLiveHole() {
+    if (!activeGame || !currentUser || !activeGame.liveState || activeGame.liveState.phase !== 'round-complete') return;
+    const player = getCurrentLivePlayer(activeGame);
+    if (!player) return;
+    const state = activeGame.liveState;
+    const recordedResults = state.roundResults || {};
+    activeGame.players.forEach(gamePlayer => {
+      const recordedScore = recordedResults[gamePlayer.id];
+      if (recordedScore && recordedScore.score !== undefined) {
+        gamePlayer.scores[state.roundIndex] = recordedScore.score;
+        gamePlayer.cardDetails[state.roundIndex] = recordedScore.cards;
+      }
+    });
+    state.readyPlayers = [...new Set([...(state.readyPlayers || []), player.id])];
+
+    closeLiveRoundSummary();
+    showToast(state.readyPlayers.length < activeGame.players.length ? 'Ready recorded. Waiting for the other player.' : 'Starting the next hole...', 'info');
+
+    if (state.readyPlayers.length >= activeGame.players.length) {
+      const nextState = createLiveGolfState(activeGame.players.map(item => item.id), 6);
+      nextState.roundIndex = (state.roundIndex || 0) + 1;
+      nextState.firstPlayerId = activeGame.players[Math.floor(Math.random() * activeGame.players.length)].id;
+      activeGame.liveState = nextState;
+    }
+    try {
+      await saveGame(activeGame, { syncToCloud: true });
+    } catch (err) {
+      showToast('Ready saved locally, but could not sync yet.', 'error');
+      console.warn('Ready for next hole sync error:', err);
+    }
+    renderScorecard();
+  }
+
+  async function revealOpeningCard(ownerId, cardIndex) {
+    await updateLiveGame((state, player) => {
+      if (ownerId !== player.id || state.phase !== 'opening') return;
+      const board = state.boards[player.id];
+      if (board.revealed[cardIndex] || (state.openingReveals[player.id] || 0) >= 2) return;
+      board.revealed[cardIndex] = true;
+      state.openingReveals[player.id] = (state.openingReveals[player.id] || 0) + 1;
+      if (Object.keys(state.openingReveals).length === 2 && Object.values(state.openingReveals).every(count => count >= 2)) {
+        state.phase = 'turn';
+        state.currentPlayerId = activeGame.firstPlayerId;
+      }
+    });
+  }
+
+  async function takeLiveCard(source) {
+    await updateLiveGame((state, player) => {
+      if ((state.phase !== 'turn' && state.phase !== 'final-reveal') || state.currentPlayerId !== player.id || state.drawnCard) return;
+      state.drawnCard = source === 'deck' ? state.deck.pop() : state.discardPile.pop();
+    });
+  }
+
+  async function discardLiveCard() {
+    await updateLiveGame((state, player) => {
+      if (state.currentPlayerId !== player.id || !state.drawnCard) return;
+      state.discardPile.push(state.drawnCard);
+      state.drawnCard = null;
+      advanceLiveTurn(state);
+    });
+  }
+
+  async function replaceLiveCard(cardIndex) {
+    await updateLiveGame((state, player) => {
+      if (state.currentPlayerId !== player.id || !state.drawnCard) return;
+      const board = state.boards[player.id];
+      state.discardPile.push(board.cards[cardIndex]);
+      board.cards[cardIndex] = state.drawnCard;
+      board.revealed[cardIndex] = true;
+      state.drawnCard = null;
+      advanceLiveTurn(state);
+    });
+  }
+
+  function advanceLiveTurn(state) {
+    if (state.phase === 'final-reveal' || state.phase === 'round-complete') return;
+    const playerIds = activeGame.players.map(player => player.id);
+    const nextId = playerIds.find(id => id !== state.currentPlayerId);
+    const currentBoard = state.boards[state.currentPlayerId];
+    if (allLiveCardsRevealed(currentBoard)) {
+      state.phase = 'final-reveal';
+      state.finalRevealPlayerId = nextId;
+      state.currentPlayerId = nextId;
+    } else {
+      state.currentPlayerId = nextId;
+    }
+  }
+
+  function finishLiveTurn(game, playerId) {
+    const state = game.liveState;
+    if (state.currentPlayerId !== playerId) return;
+    const playerBoard = state.boards[playerId];
+    if (state.phase === 'turn' && hasFourMatchingCorners(playerBoard)) {
+      state.cornerWinPlayerId = playerId;
+      state.cornerWinAt = new Date().toISOString();
+      state.phase = 'final-reveal';
+      state.finalRevealPlayerId = game.players.find(player => player.id !== playerId)?.id || null;
+      state.currentPlayerId = state.finalRevealPlayerId;
+      return;
+    }
+    if (state.phase === 'final-reveal') {
+      if (hasFourMatchingCorners(playerBoard)) {
+        state.cornerWinPlayerId = playerId;
+        state.cornerWinAt = new Date().toISOString();
+      }
+      Object.values(state.boards).forEach(board => {
+        board.revealed = Array(6).fill(true);
+      });
+      game.players.forEach(player => {
+        const board = state.boards[player.id];
+        const score = player.id === state.cornerWinPlayerId ? -20 : liveBoardScore(board);
+        player.cardDetails[state.roundIndex] = board.cards.map(card => `${card.rank}${card.suit}`).join(' ');
+        player.scores[state.roundIndex] = score;
+      });
+      state.roundResults = {};
+      game.players.forEach(player => {
+        state.roundResults[player.id] = {
+          score: player.scores[state.roundIndex],
+          cards: player.cardDetails[state.roundIndex]
+        };
+      });
+      const isFinalHole = state.roundIndex >= ((game.holes || 9) - 1);
+      state.phase = isFinalHole ? 'game-complete' : 'round-complete';
+      state.currentPlayerId = null;
+      state.finalRevealPlayerId = null;
+      state.roundCompletedAt = new Date().toISOString();
+      if (isFinalHole) {
+        state.gameCompletedAt = state.roundCompletedAt;
+        game.completed = true;
+      }
+      return;
+    }
+    advanceLiveTurn(state);
+  }
+
+  function closeLiveRoundSummary() {
+    const modal = document.getElementById('modal-live-round-summary');
+    if (activeGame && activeGame.liveState && ['round-complete', 'game-complete'].includes(activeGame.liveState.phase)) {
+      liveRoundDismissedKey = `${activeGame.id}:${activeGame.liveState.roundIndex || 0}`;
+    }
+    if (modal) modal.classList.remove('is-open');
+  }
+
+  function showLiveRoundSummary(game) {
+    if (!game || !game.liveState || !['round-complete', 'game-complete'].includes(game.liveState.phase)) return;
+    const currentPlayer = getCurrentLivePlayer(game);
+    if (currentPlayer && (game.liveState.readyPlayers || []).includes(currentPlayer.id)) return;
+    const modal = document.getElementById('modal-live-round-summary');
+    const results = document.getElementById('live-round-results');
+    const subtitle = document.getElementById('live-round-summary-subtitle');
+    if (!modal || !results) return;
+
+    const roundIndex = game.liveState.roundIndex || 0;
+    const gameComplete = game.liveState.phase === 'game-complete';
+    const summaryKey = `${game.id}:${roundIndex}`;
+    if (liveRoundDismissedKey === summaryKey) return;
+    if (liveRoundModalKey === summaryKey && modal.classList.contains('is-open')) return;
+    liveRoundModalKey = summaryKey;
+
+    const summaryTitle = document.getElementById('live-round-summary-title');
+    const readyButton = document.getElementById('btn-live-round-ready');
+    if (summaryTitle) summaryTitle.textContent = gameComplete ? 'Game Over' : 'Round Over';
+    if (readyButton) readyButton.style.display = gameComplete ? 'none' : '';
+    if (subtitle) subtitle.textContent = gameComplete
+      ? `Final hole complete. ${escapeHtml(getGameWinner(game).name)} wins the game!`
+      : game.liveState.cornerWinPlayerId
+      ? `Four matching corner cards! ${escapeHtml(game.players.find(player => player.id === game.liveState.cornerWinPlayerId)?.name || 'A player')} scored -20 automatically.`
+      : `Hole ${roundIndex + 1} is complete. Both players revealed all six cards.`;
+    if (gameComplete && lastLiveGameWinKey !== `${game.id}:${game.liveState.gameCompletedAt}`) {
+      lastLiveGameWinKey = `${game.id}:${game.liveState.gameCompletedAt}`;
+      triggerConfetti();
+    }
+    results.innerHTML = game.players.map(player => {
+      const recordedResult = game.liveState.roundResults && game.liveState.roundResults[player.id];
+      const roundScore = recordedResult && recordedResult.score !== undefined
+        ? recordedResult.score
+        : (player.scores[roundIndex] ?? 0);
+      const totalScore = player.scores.reduce((total, score) => total + (score ?? 0), 0);
+      const isCurrentPlayer = currentUser && player.uid === currentUser.uid;
+      return `<div class="live-round-result-row ${isCurrentPlayer ? 'is-current-player' : ''}">
+        <div><strong>${escapeHtml(player.name)}${isCurrentPlayer ? ' (You)' : ''}</strong><small>Hole ${roundIndex + 1}</small></div>
+        <div class="live-round-score"><strong>${roundScore}</strong><small>Round</small></div>
+        <div class="live-round-score"><strong>${totalScore}</strong><small>Total</small></div>
+      </div>`;
+    }).join('');
+    modal.classList.add('is-open');
+  }
+
+  function renderLiveCardBoard() {
+    const board = document.getElementById('live-card-board');
+    const grid = document.getElementById('live-card-board-grid');
+    const status = document.getElementById('live-board-status');
+    if (!board || !grid) return;
+
+    const isLiveGolf = activeGame && activeGame.isLiveChallenge && activeGame.gameType === 'golf';
+    if (!isLiveGolf) {
+      board.classList.add('hidden');
+      return;
+    }
+
+    ensureLiveGolfState(activeGame);
+    const liveState = activeGame.liveState;
+    if (!['round-complete', 'game-complete'].includes(liveState.phase)) {
+      const summaryModal = document.getElementById('modal-live-round-summary');
+      if (summaryModal) summaryModal.classList.remove('is-open');
+      liveRoundModalKey = null;
+      liveRoundDismissedKey = null;
+    }
+    const player = getCurrentLivePlayer(activeGame);
+    board.classList.remove('hidden');
+    if (!player || !liveState.boards[player.id]) {
+      grid.innerHTML = '<p class="empty-state-copy">Your card layout is being dealt...</p>';
+      return;
+    }
+
+    const currentTurn = liveState.currentPlayerId === player.id;
+    const isOpening = liveState.phase === 'opening';
+    const canRevealOpening = isOpening && (liveState.openingReveals[player.id] || 0) < 2;
+    const canAct = currentTurn && (liveState.phase === 'turn' || liveState.phase === 'final-reveal');
+    const drawn = liveState.drawnCard;
+    const finalTurnPlayer = activeGame.players.find(item => item.id === liveState.finalRevealPlayerId);
+    const alreadyReady = (liveState.readyPlayers || []).includes(player.id);
+    if (liveState.cornerWinAt && lastCornerWinKey !== `${activeGame.id}:${liveState.cornerWinAt}`) {
+      lastCornerWinKey = `${activeGame.id}:${liveState.cornerWinAt}`;
+      triggerConfetti();
+      showToast('🎉 Four matching corners! Automatic -20 score!', 'winner');
+    }
+    if (currentTurn && lastLiveTurnId && lastLiveTurnId !== liveState.currentPlayerId) {
+      showToast("🔔 It's your turn in the live Golf game!", 'success');
+    }
+    lastLiveTurnId = liveState.currentPlayerId;
+    const boardMarkup = activeGame.players.map(otherPlayer => {
+      const otherBoard = liveState.boards[otherPlayer.id];
+      if (!otherBoard) return '';
+      const isMine = otherPlayer.id === player.id;
+      return `<div class="live-player-board">
+        <div class="live-player-board-heading"><strong>${isMine ? 'Your' : escapeHtml(otherPlayer.name)} Grid</strong><span>${isMine ? `${otherBoard.revealed.filter(Boolean).length}/6 face up` : 'Opponent cards hidden'}</span></div>
+        <div class="live-card-grid" style="--card-columns:3;">${otherBoard.cards.map((card, index) => {
+          const revealed = ['round-complete', 'game-complete'].includes(liveState.phase) || otherBoard.revealed[index];
+          const clickable = isMine && ((canRevealOpening && !revealed) || (canAct && !!drawn));
+          return `<button type="button" class="live-card ${revealed ? 'is-revealed' : ''} ${card.red ? 'is-red' : ''}" data-card-index="${index}" ${clickable ? '' : 'disabled'}>
+            ${revealed ? `<span class="live-card-rank">${escapeHtml(card.rank)}</span><span class="live-card-suit">${card.suit}</span>` : '<span class="live-card-back">?</span>'}
+          </button>`;
+        }).join('')}</div>
+      </div>`;
+    }).join('');
+
+    const topDiscard = liveState.discardPile[liveState.discardPile.length - 1];
+    const discardMarkup = topDiscard ? `<button type="button" class="live-pile-card is-discard ${topDiscard.red ? 'is-red' : ''}" id="btn-live-discard-card" ${canAct && !drawn ? '' : 'disabled'}><span>${escapeHtml(topDiscard.rank)}</span><span>${topDiscard.suit}</span></button>` : '<div class="live-pile-empty">Empty</div>';
+    const drawnMarkup = drawn ? `<div class="live-drawn-card is-revealed ${drawn.red ? 'is-red' : ''}"><span class="live-card-rank">${escapeHtml(drawn.rank)}</span><span class="live-card-suit">${drawn.suit}</span></div>` : '<span class="live-drawn-empty">No card drawn</span>';
+    grid.innerHTML = `
+      <div class="live-turn-panel">
+        <strong>${liveState.phase === 'opening' ? 'Opening reveal: turn any two of your cards' : liveState.phase === 'final-reveal' ? (currentTurn ? 'FINAL TURN!' : `FINAL TURN: ${escapeHtml(finalTurnPlayer ? finalTurnPlayer.name : 'Opponent')}`) : liveState.phase === 'game-complete' ? 'Game Over' : liveState.phase === 'round-complete' ? 'Round complete' : currentTurn ? "It's your turn" : `${escapeHtml(activeGame.players.find(p => p.id === liveState.currentPlayerId)?.name || 'Opponent')}'s turn`}</strong>
+        <span class="live-turn-phase">${liveState.phase === 'opening' ? `${liveState.openingReveals[player.id] || 0}/2 revealed` : liveState.phase}</span>
+      </div>
+      <div class="live-piles">
+        <button type="button" class="live-pile-button" id="btn-live-draw-deck" ${canAct && !drawn ? '' : 'disabled'}><span class="live-card-back">?</span><small>Draw pile (${liveState.deck.length})</small></button>
+        <div><strong>Discard</strong>${discardMarkup}<small>Top discard</small></div>
+        <div class="live-draw-area"><strong>${currentTurn ? 'Your draw' : 'Their draw'}</strong>${drawnMarkup}</div>
+      </div>
+      ${liveState.phase === 'round-complete' ? `<button type="button" class="btn btn-primary btn-sm live-next-round-button" id="btn-live-next-round" ${alreadyReady ? 'disabled' : ''}>${alreadyReady ? 'Waiting for Other Player' : 'Next Round'}</button>` : ''}
+      <div class="live-action-row">
+        <button type="button" class="btn btn-outline btn-sm" id="btn-live-take-discard" ${canAct && !drawn && topDiscard ? '' : 'disabled'}>Take discard</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btn-live-discard-drawn" ${canAct && drawn ? '' : 'disabled'}>Discard drawn card</button>
+      </div>
+      ${boardMarkup}`;
+    if (status) {
+      const opponent = activeGame.players.find(other => other.id !== player.id);
+      status.textContent = opponent ? (liveState.phase === 'final-reveal' ? (currentTurn ? 'FINAL TURN! Complete your six-card grid now.' : `${finalTurnPlayer ? finalTurnPlayer.name : opponent.name} has the FINAL TURN!`) : `${opponent.name} is in the match. ${currentTurn ? 'Choose a pile, then choose a grid card to replace it.' : 'You will be notified when the turn changes.'}`) : 'Waiting for the other player to accept the challenge...';
+    }
+    if (['round-complete', 'game-complete'].includes(liveState.phase)) showLiveRoundSummary(activeGame);
+
+    grid.querySelectorAll('.live-card:not(:disabled)').forEach(button => {
+      button.addEventListener('click', async () => {
+        const cardIndex = parseInt(button.getAttribute('data-card-index'), 10);
+        const ownBoard = liveState.boards[player.id];
+        if (isOpening && !ownBoard.revealed[cardIndex]) {
+          ownBoard.revealed[cardIndex] = true;
+          liveState.openingReveals[player.id] = (liveState.openingReveals[player.id] || 0) + 1;
+          if (activeGame.players.every(p => (liveState.openingReveals[p.id] || 0) >= 2)) {
+            liveState.phase = 'turn';
+            liveState.currentPlayerId = liveState.firstPlayerId;
+          }
+        } else if (canAct && drawn) {
+          const replaced = ownBoard.cards[cardIndex];
+          ownBoard.cards[cardIndex] = drawn;
+          ownBoard.revealed[cardIndex] = true;
+          liveState.discardPile.push(replaced);
+          liveState.drawnCard = null;
+          finishLiveTurn(activeGame, player.id);
+          if (['round-complete', 'game-complete'].includes(liveState.phase)) showLiveRoundSummary(activeGame);
+        }
+        await saveGame(activeGame, { syncToCloud: true });
+        renderLiveCardBoard();
+        if (['round-complete', 'game-complete'].includes(liveState.phase)) showLiveRoundSummary(activeGame);
+      });
+    });
+
+    const drawFromDeck = () => {
+      if (!canAct || drawn || liveState.deck.length === 0) return;
+      liveState.drawnCard = liveState.deck.pop();
+      renderLiveCardBoard();
+      saveGame(activeGame, { syncToCloud: true });
+    };
+    const takeDiscard = () => {
+      if (!canAct || drawn || liveState.discardPile.length === 0) return;
+      liveState.drawnCard = liveState.discardPile.pop();
+      renderLiveCardBoard();
+      saveGame(activeGame, { syncToCloud: true });
+    };
+    const discardDrawn = async () => {
+      if (!canAct || !drawn) return;
+      liveState.discardPile.push(liveState.drawnCard);
+      liveState.drawnCard = null;
+      finishLiveTurn(activeGame, player.id);
+      const completedGame = ['round-complete', 'game-complete'].includes(liveState.phase) ? JSON.parse(JSON.stringify(activeGame)) : null;
+      if (completedGame) showLiveRoundSummary(completedGame);
+      await saveGame(activeGame, { syncToCloud: true });
+      if (completedGame) {
+        showLiveRoundSummary(completedGame);
+        setTimeout(() => showLiveRoundSummary(completedGame), 250);
+      }
+      renderLiveCardBoard();
+    };
+    document.getElementById('btn-live-draw-deck')?.addEventListener('click', drawFromDeck);
+    document.getElementById('btn-live-next-round')?.addEventListener('click', readyForNextLiveHole);
+    document.getElementById('btn-live-take-discard')?.addEventListener('click', takeDiscard);
+    document.getElementById('btn-live-discard-card')?.addEventListener('click', takeDiscard);
+    document.getElementById('btn-live-discard-drawn')?.addEventListener('click', discardDrawn);
+  }
+
+  function loadLiveChallenges() {
+    const list = document.getElementById('profile-live-challenges-list');
+    if (!list) return;
+    if (liveChallengesUnsubscribe) {
+      liveChallengesUnsubscribe();
+      liveChallengesUnsubscribe = null;
+    }
+    if (!currentUser || !db || !currentUser.email) {
+      list.innerHTML = '<p class="empty-state-copy">Sign in to receive live game challenges.</p>';
+      return;
+    }
+
+    try {
+      liveChallengesUnsubscribe = db.collection('games')
+        .where('liveChallenge.invitedEmail', '==', normalizeEmail(currentUser.email))
+        .onSnapshot(snap => {
+          const challenges = [];
+          snap.forEach(doc => {
+            const game = doc.data();
+            if (game.liveChallenge && game.liveChallenge.status === 'pending') challenges.push(game);
+          });
+          if (challenges.length === 0) {
+            list.innerHTML = '<p class="empty-state-copy">No live game challenges right now.</p>';
+            return;
+          }
+          list.innerHTML = challenges.map(game => `
+            <article class="live-challenge-card">
+              <div>
+                <strong>🃏 ${escapeHtml(game.title)}</strong>
+                <p>${escapeHtml(game.liveChallenge.ownerEmail || 'A ScoreSheets player')} challenged you to ${game.variant}-card Golf.</p>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm btn-accept-live-challenge" data-game-id="${escapeHtml(game.id)}">Accept &amp; Play</button>
+            </article>
+          `).join('');
+          list.querySelectorAll('.btn-accept-live-challenge').forEach(button => {
+            button.addEventListener('click', () => acceptLiveChallenge(button.getAttribute('data-game-id')));
+          });
+        }, err => {
+          list.innerHTML = '<p class="empty-state-copy">Challenges could not be loaded. Try again shortly.</p>';
+          console.warn('Live challenge subscription error:', err);
+        });
+    } catch (err) {
+      list.innerHTML = '<p class="empty-state-copy">Challenges could not be loaded. Try again shortly.</p>';
+      console.warn('Live challenge load error:', err);
+    }
+  }
+
+  async function acceptLiveChallenge(gameId) {
+    if (!currentUser || !db) return;
+    const snapshot = await db.collection('games').doc(gameId).get();
+    if (!snapshot.exists) {
+      showToast('That challenge is no longer available.', 'error');
+      return;
+    }
+    const game = snapshot.data();
+    if (!game.liveChallenge || game.liveChallenge.status !== 'pending') {
+      showToast('That challenge has already been accepted.', 'info');
+      return;
+    }
+    const player = {
+      id: 'player_' + currentUser.uid,
+      uid: currentUser.uid,
+      name: currentUser.displayName || currentUser.email.split('@')[0],
+      email: normalizeEmail(currentUser.email),
+      scores: Array(game.holes).fill(null),
+      cardDetails: Array(game.holes).fill(null)
+    };
+    game.players = [...(game.players || []), player];
+    game.participantUids = [...new Set([...(game.participantUids || []), currentUser.uid])];
+    game.liveChallenge = { ...game.liveChallenge, status: 'active', invitedUid: currentUser.uid, acceptedAt: new Date().toISOString() };
+    ensureLiveGolfState(game);
+    game.liveState.boards[player.id] = {
+      cards: game.liveState.deck.splice(0, 6),
+      revealed: Array(6).fill(false)
+    };
+    game.liveState.firstPlayerId = game.players[Math.floor(Math.random() * game.players.length)].id;
+    game.liveState.currentPlayerId = null;
+    game.liveState.phase = 'opening';
+    await saveGame(game, { syncToCloud: true });
+    openGame(game);
+    showToast('Live challenge accepted. Your cards are ready!', 'success');
+  }
+
   function renderSetupGameTypeSelector() {
     const container = document.getElementById('setup-game-type-selector');
     container.innerHTML = Object.values(GAMES_REGISTRY).map(game => `
@@ -838,6 +1398,14 @@
 
   function updateSetupFormForGame(gameType) {
     const game = GAMES_REGISTRY[gameType] || GAMES_REGISTRY.golf;
+
+    const challengeGroup = document.getElementById('setup-live-challenge-group');
+    const challengeEmail = document.getElementById('input-challenge-email');
+    if (challengeGroup) {
+      const canChallenge = gameType === 'golf' && !!currentUser;
+      challengeGroup.classList.toggle('hidden', !canChallenge);
+      if (challengeEmail) challengeEmail.required = false;
+    }
 
     // Default title
     const titleInput = document.getElementById('input-game-title');
@@ -1000,11 +1568,27 @@
       playerNames.push(name);
       players.push({
         id: 'p_' + Date.now() + '_' + i,
+        uid: i === 0 && currentUser ? currentUser.uid : null,
         name: name,
         scores: Array(holes).fill(null),
         cardDetails: Array(holes).fill(null)
       });
     });
+
+    const challengeEmail = normalizeEmail(document.getElementById('input-challenge-email')?.value);
+    const isLiveChallenge = setupSelectedGameType === 'golf' && !!challengeEmail;
+    if (isLiveChallenge) {
+      if (!currentUser) {
+        showToast('Sign in before sending a live challenge.', 'error');
+        return;
+      }
+      if (challengeEmail === normalizeEmail(currentUser.email)) {
+        showToast('Choose another player email address.', 'error');
+        return;
+      }
+      players[0].name = currentUser.displayName || currentUser.email.split('@')[0];
+      players.splice(1);
+    }
 
     if (players.length === 0) {
       showToast('Please add at least one player', 'error');
@@ -1030,13 +1614,29 @@
       completed: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      createdBy: currentUser ? currentUser.uid : 'anonymous'
+      createdBy: currentUser ? currentUser.uid : 'anonymous',
+      isLiveChallenge,
+      participantUids: currentUser ? [currentUser.uid] : [],
+      liveState: isLiveChallenge && currentUser ? createLiveGolfState([players[0].id], 6) : null,
+      cardLayouts: {},
+      liveChallenge: isLiveChallenge ? {
+        status: 'pending',
+        invitedEmail: challengeEmail,
+        ownerUid: currentUser.uid,
+        ownerEmail: normalizeEmail(currentUser.email),
+        createdAt: new Date().toISOString()
+      } : null
     };
+
+    if (isLiveChallenge) {
+      gameData.liveState.firstPlayerId = players[0].id;
+      gameData.liveState.currentPlayerId = null;
+    }
 
     // Save locally and initialize in cloud asynchronously if available
     await saveGame(gameData, { syncToCloud: true });
     openGame(gameData);
-    showToast(`${gameConfig.name} match created! 🎲 (Offline-ready)`, 'success');
+    showToast(isLiveChallenge ? `Live challenge sent to ${challengeEmail}! 🚩` : `${gameConfig.name} match created! 🎲 (Offline-ready)`, 'success');
   }
 
   // ==========================================================
@@ -1139,7 +1739,12 @@
     // Only make network Firestore request when syncToCloud is true (game creation, finalization, resume, delete)
     if (syncToCloud && db) {
       try {
-        await db.collection('games').doc(game.id).set(game, { merge: true });
+        const cloudGame = JSON.parse(JSON.stringify(game));
+        cloudGame.players = (cloudGame.players || []).map(player => ({
+          ...player,
+          cardDetails: (player.cardDetails || []).map(details => Array.isArray(details) ? details.join(' ') : details)
+        }));
+        await db.collection('games').doc(game.id).set(cloudGame, { merge: true });
         if (currentUser) {
           const userDocData = {
             id: game.id,
@@ -1199,6 +1804,8 @@
 
   async function deleteGame(gameId) {
     if (!confirm('Remove this match card from your history? (Scores will still count toward your lifetime stats)')) return;
+    const wasProfileView = document.getElementById('view-profile')?.classList.contains('is-active');
+    const wasManageSheetsView = document.getElementById('view-manage-sheets')?.classList.contains('is-active');
 
     // Find and preserve game data in permanent stats storage before deleting from active list
     const targetGame = getLocalGames().find(g => g.id === gameId) || gamesList.find(g => g.id === gameId);
@@ -1221,8 +1828,15 @@
     }
 
     showToast('Match removed from history (stats preserved)', 'info');
-    loadGamesList();
-    showView('view-home');
+    await loadGamesList();
+    if (wasProfileView) {
+      renderProfileView();
+    } else if (wasManageSheetsView) {
+      renderManageSheetsTable(gamesList);
+      showView('view-manage-sheets');
+    } else {
+      showView('view-home');
+    }
   }
 
   async function loadGamesList() {
@@ -1565,6 +2179,10 @@
       firestoreUnsubscribe();
       firestoreUnsubscribe = null;
     }
+    if (liveRefreshTimer) {
+      clearInterval(liveRefreshTimer);
+      liveRefreshTimer = null;
+    }
 
     // Keep URL parameter synchronized so refreshing stays on the active scorecard
     try {
@@ -1581,6 +2199,39 @@
     renderScorecard();
     showView('view-scorecard');
     requestWakeLock();
+
+    if (db && game && game.isLiveChallenge) {
+      const applyLiveSnapshot = snapshot => {
+        if (!snapshot.exists) return;
+        const wasCompleted = !!(activeGame && activeGame.id === snapshot.id && activeGame.completed);
+        activeGame = snapshot.data();
+        if (activeGame.isLiveChallenge) ensureLiveGolfState(activeGame);
+        const localGames = getLocalGames().filter(saved => saved.id !== activeGame.id);
+        saveLocalGames([activeGame, ...localGames]);
+        if (activeGame.liveState && ['round-complete', 'game-complete'].includes(activeGame.liveState.phase)) {
+          showLiveRoundSummary(activeGame);
+        }
+        renderScorecard();
+        if (!wasCompleted && activeGame.completed) {
+          showToast('🏁 The live match has been finalized.', 'winner');
+        }
+        if (activeGame.liveState && ['round-complete', 'game-complete'].includes(activeGame.liveState.phase)) {
+          setTimeout(() => showLiveRoundSummary(activeGame), 0);
+          setTimeout(() => showLiveRoundSummary(activeGame), 300);
+        }
+      };
+      firestoreUnsubscribe = db.collection('games').doc(game.id).onSnapshot(applyLiveSnapshot, err => {
+        console.warn('Live game update error:', err);
+      });
+      liveRefreshTimer = setInterval(async () => {
+        try {
+          const snapshot = await db.collection('games').doc(game.id).get({ source: 'server' });
+          applyLiveSnapshot(snapshot);
+        } catch (err) {
+          console.warn('Live game refresh error:', err);
+        }
+      }, 2000);
+    }
   }
 
   // Check if any player in the game has reached exactly 100 points
@@ -1683,6 +2334,7 @@
     updateWakeLockUI();
     renderLeaderboardBar();
     renderScoreTable();
+    renderLiveCardBoard();
   }
 
   function renderLeaderboardBar() {
@@ -1723,6 +2375,7 @@
     const gType = activeGame.gameType || 'golf';
     const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
     const roundName = gameConfig.roundName || 'Round';
+    const liveScoreLocked = activeGame.isLiveChallenge;
 
     // Headers
     let headHtml = `<th class="hole-col">${roundName}</th>`;
@@ -1749,7 +2402,7 @@
         const scoreText = hasScore ? score : '-';
         bodyHtml += `
           <td>
-            <button type="button" class="${scoreClass}" data-player-id="${escapeHtml(p.id)}" data-hole-idx="${h}">
+            <button type="button" class="${scoreClass}" data-player-id="${escapeHtml(p.id)}" data-hole-idx="${h}" ${liveScoreLocked ? 'disabled' : ''}>
               <span>${scoreText}</span>
               ${hasScore ? '<span class="score-subtag">pts</span>' : ''}
             </button>
@@ -1783,6 +2436,7 @@
   const REAL_GOLF_QUICK_SCORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const SCRABBLE_QUICK_SCORES = [0, 5, 8, 10, 12, 14, 16, 18, 20, 24, 28, 30, 35, 40, 50, 60, 70, 80];
   const CRIBBAGE_QUICK_SCORES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 24, 28, 29];
+  const CRIB_GRID_QUICK_SCORES = [0, 4, 6, 8, 10, 12, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40];
   const GENERIC_QUICK_SCORES = [-10, -5, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 50, 100];
 
   // ==========================================================
@@ -1918,8 +2572,10 @@
       scoresList = REAL_GOLF_QUICK_SCORES;
     } else if (gameType === 'scrabble') {
       scoresList = SCRABBLE_QUICK_SCORES;
-    } else if (gameType === 'cribbage' || gameType === 'crib') {
+    } else if (gameType === 'cribbage') {
       scoresList = CRIBBAGE_QUICK_SCORES;
+    } else if (gameType === 'crib') {
+      scoresList = CRIB_GRID_QUICK_SCORES;
     }
 
     let html = scoresList.map(num => {
@@ -2025,7 +2681,7 @@
 
     try {
       // Save locally (offline-first during match; if reactivated, sync state)
-      await saveGame(activeGame, { syncToCloud: wasCompleted });
+      await saveGame(activeGame, { syncToCloud: wasCompleted || activeGame.isLiveChallenge });
     } catch (err) {
       console.warn('Error saving local score:', err);
     }
@@ -2058,7 +2714,7 @@
 
     try {
       // Save locally (offline-first during match; if reactivated, sync state)
-      await saveGame(activeGame, { syncToCloud: wasCompleted });
+      await saveGame(activeGame, { syncToCloud: wasCompleted || activeGame.isLiveChallenge });
     } catch (err) {
       console.warn('Error clearing score:', err);
     }
@@ -2103,6 +2759,48 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  async function startGoogleSignIn() {
+    ensureFirebaseServices();
+    if (!auth) {
+      showToast('Firebase Auth is ready once hosted on Firebase!', 'info');
+      return;
+    }
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      provider.setCustomParameters({ prompt: 'select_account' });
+      if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        await auth.signInWithRedirect(provider);
+        return;
+      }
+      await authReady;
+      const result = await auth.signInWithPopup(provider);
+      if (result && result.user) {
+        currentUser = result.user;
+        updateAuthUI();
+        closeSignInModal();
+        dismissSplashScreen();
+        showToast('Signed in successfully!', 'success');
+        showAuthDebugDialog(result.user);
+      }
+    } catch (err) {
+      console.error('Google sign-in error:', err);
+      showToast(err.code === 'auth/network-request-failed'
+        ? 'Google sign-in was blocked by this browser. Check browser privacy settings and try again.'
+        : 'Sign in error: ' + err.message, 'error');
+    }
+  }
+
+  function openProfileOrSignIn() {
+    if (currentUser || (auth && auth.currentUser)) {
+      currentUser = currentUser || auth.currentUser;
+      renderProfileView();
+    } else {
+      openSignInModal();
+    }
   }
 
   function setupEventListeners() {
@@ -2171,6 +2869,7 @@
           closeSignInModal();
           dismissSplashScreen();
           showToast('Signed in successfully!', 'success');
+          if (userCred && userCred.user) showAuthDebugDialog(userCred.user);
         } catch (err) {
           if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
             try {
@@ -2182,6 +2881,7 @@
               closeSignInModal();
               dismissSplashScreen();
               showToast('Account created and signed in!', 'success');
+              if (userCred2 && userCred2.user) showAuthDebugDialog(userCred2.user);
             } catch (err2) {
               if (err2.code === 'auth/email-already-in-use') {
                 alert('Incorrect password. Please try again or use Forgot password.');
@@ -2390,6 +3090,17 @@
     document.getElementById('btn-save-score').addEventListener('click', saveScoreFromModal);
     document.getElementById('btn-clear-score').addEventListener('click', clearScoreFromModal);
 
+    const liveRoundReadyBtn = document.getElementById('btn-live-round-ready');
+    if (liveRoundReadyBtn) {
+      liveRoundReadyBtn.addEventListener('click', readyForNextLiveHole);
+    }
+    const liveRoundDismissBtn = document.getElementById('btn-live-round-dismiss');
+    if (liveRoundDismissBtn) {
+      liveRoundDismissBtn.addEventListener('click', closeLiveRoundSummary);
+    }
+    document.getElementById('btn-close-auth-debug')?.addEventListener('click', closeAuthDebugDialog);
+    document.getElementById('btn-auth-debug-continue')?.addEventListener('click', closeAuthDebugDialog);
+
     // Quick Decrement / Increment Stepper Buttons (- / +)
     const btnScoreDec = document.getElementById('btn-score-dec');
     if (btnScoreDec) {
@@ -2419,14 +3130,9 @@
     }
 
     // Auth & Profile Navigation Action
-    document.getElementById('btn-auth-action').addEventListener('click', () => {
-      if (currentUser) {
-        // Open dedicated Profile & Stats Page
-        renderProfileView();
-      } else {
-        openSignInModal();
-      }
-    });
+    const authActionButton = document.getElementById('btn-auth-action');
+    authActionButton.addEventListener('click', openProfileOrSignIn);
+    authActionButton.dataset.profileHandlerBound = 'true';
 
     // Profile Page Back & Log Out actions
     const profileBackBtn = document.getElementById('btn-profile-back');
@@ -2453,56 +3159,11 @@
       });
     }
 
-    const handleGoogleAuth = async () => {
-      ensureFirebaseServices();
-
-      if (!auth) {
-        showToast('Firebase Auth is ready once hosted on Firebase!', 'info');
-        closeSignInModal();
-        return;
-      }
-      try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        provider.addScope('email');
-        provider.addScope('profile');
-        provider.setCustomParameters({ prompt: 'select_account' });
-        const result = await auth.signInWithPopup(provider);
-        if (result && result.user) {
-          currentUser = result.user;
-          updateAuthUI();
-        }
-        closeSignInModal();
-        dismissSplashScreen();
-        showToast('Signed in successfully!', 'success');
-      } catch (err) {
-        console.error('Google sign-in error:', err);
-        if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
-          try {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            provider.addScope('email');
-            provider.addScope('profile');
-            await auth.signInWithRedirect(provider);
-          } catch (e2) {
-            showToast('Sign in error: ' + err.message, 'error');
-          }
-        } else {
-          showToast('Sign in error: ' + err.message, 'error');
-        }
-      }
-    };
-
     const modalGoogleSigninBtn = document.getElementById('modal-google-signin');
     if (modalGoogleSigninBtn) {
-      modalGoogleSigninBtn.addEventListener('click', handleGoogleAuth);
+      modalGoogleSigninBtn.addEventListener('click', startGoogleSignIn);
+      modalGoogleSigninBtn.dataset.googleHandlerBound = 'true';
     }
-
-    document.getElementById('btn-sign-out').addEventListener('click', async () => {
-      if (auth) {
-        await auth.signOut();
-        authModal.classList.remove('is-open');
-        showToast('Signed out', 'info');
-      }
-    });
 
     // Screen Wake Lock Toggle & Auto-Reacquire
     const wakeLockChip = document.getElementById('btn-wakelock-chip');
@@ -2571,8 +3232,31 @@
   }
 
   // Bootstrap
-  document.addEventListener('DOMContentLoaded', () => {
-    setupEventListeners();
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      setupEventListeners();
+    } catch (err) {
+      console.error('ScoreSheets event setup error:', err);
+      const googleButton = document.getElementById('modal-google-signin');
+      if (googleButton && googleButton.dataset.googleHandlerBound !== 'true') {
+        googleButton.addEventListener('click', startGoogleSignIn);
+        googleButton.dataset.googleHandlerBound = 'true';
+      }
+      const authActionButton = document.getElementById('btn-auth-action');
+      if (authActionButton && authActionButton.dataset.profileHandlerBound !== 'true') {
+        authActionButton.addEventListener('click', openProfileOrSignIn);
+        authActionButton.dataset.profileHandlerBound = 'true';
+      }
+    }
+    try {
+      const response = await fetch('/__/firebase/init.json');
+      if (response.ok) {
+        const config = await response.json();
+        window.firebaseConfig = { ...config, authDomain: window.location.host };
+      }
+    } catch (e) {
+      console.warn('Could not load Firebase runtime config; using offline mode.');
+    }
     initFirebase();
   });
 
