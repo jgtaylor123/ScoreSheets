@@ -19,5 +19,8 @@
     "firestore"
   ],
   "author": "Jonathan Taylor <jgtaylor@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "firebase-tools": "^14.27.0"
+  }
 }
