@@ -2476,3 +2476,27 @@ body.splash-active {
     height: 40px;
   }
 }
+
+/* Stack the brand to keep the header compact. */
+.header .brand {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+.header .brand-icon {
+  width: 28px;
+  height: 28px;
+}
+.header .brand-text {
+  display: block;
+}
+.header .brand-text h1 {
+  justify-content: center;
+  font-size: 0.85rem;
+  line-height: 1.15;
+}
+.header .brand-badge,
+.header .brand-text p {
+  display: none;
+}
