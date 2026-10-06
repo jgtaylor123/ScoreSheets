@@ -2518,3 +2518,14 @@ body.splash-active {
   }
   .header-actions #btn-install-app { height: 40px; }
 }
+
+.recent-matches > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.recent-matches > summary::-webkit-details-marker { display: none; }
+.recent-matches > summary .section-title::before {
+  content: '▸ ';
+  color: var(--accent-gold);
+}
+.recent-matches[open] > summary .section-title::before { content: '▾ '; }

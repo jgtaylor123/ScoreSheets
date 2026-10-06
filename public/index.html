@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="ScoreSheets" />
     <script src="/install.js?v=2" defer></script>
     <link rel="manifest" href="/manifest.json" />
-    <link rel="stylesheet" href="/styles.css?v=15" />
+    <link rel="stylesheet" href="/styles.css?v=16" />
   </head>
   <body class="splash-active">
     <!-- Branded Splash Screen (Settle the Score) -->
@@ -168,14 +168,16 @@
         </section>
 
         <!-- Saved / Recent Matches Section (for Guests / General History) -->
-        <div class="section-header">
-          <h3 class="section-title">📁 Recent Matches History</h3>
-          <button type="button" class="btn btn-outline btn-sm" id="btn-refresh-games">🔄 Refresh</button>
-        </div>
         <p id="sheet-sync-status" role="status" hidden style="color: var(--text-muted); margin-bottom: 1rem;"></p>
-        <div id="games-list-container" class="games-grid">
-          <!-- Populated via JS -->
-        </div>
+        <details class="recent-matches">
+          <summary class="section-header">
+            <span class="section-title">Recent Matches</span>
+            <button type="button" class="btn btn-outline btn-sm" id="btn-refresh-games">🔄 Refresh</button>
+          </summary>
+          <div id="games-list-container" class="games-grid">
+            <!-- Populated via JS -->
+          </div>
+        </details>
       </section>
 
       <!-- VIEW: MANAGE SHEETS -->
