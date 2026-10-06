@@ -315,36 +315,36 @@
   }
 
   function closeSignInModal() {
-
-      function showAuthDebugDialog(user) {
-        if (!user) return;
-        const modal = document.getElementById('auth-debug-modal');
-        const details = document.getElementById('auth-debug-details');
-        if (!modal || !details) return;
-        const provider = user.providerData && user.providerData[0]
-          ? user.providerData[0].providerId
-          : 'password';
-        const rows = [
-          ['Email', user.email || 'Unavailable'],
-          ['Provider', provider],
-          ['Firebase UID', user.uid || 'Unavailable'],
-          ['Auth domain', firebase?.app?.().options?.authDomain || 'Unavailable'],
-          ['Browser', navigator.userAgent],
-          ['App origin', window.location.origin],
-          ['Session', firebase?.auth?.().currentUser ? 'Authenticated' : 'Not detected']
-        ];
-        details.innerHTML = rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
-        modal.classList.add('is-open');
-      }
-
-      function closeAuthDebugDialog() {
-        document.getElementById('auth-debug-modal')?.classList.remove('is-open');
-      }
     const modal = document.getElementById('signin-modal');
     if (modal) {
       modal.classList.remove('is-open');
       modal.setAttribute('aria-hidden', 'true');
     }
+  }
+
+  function showAuthDebugDialog(user) {
+    if (!user) return;
+    const modal = document.getElementById('auth-debug-modal');
+    const details = document.getElementById('auth-debug-details');
+    if (!modal || !details) return;
+    const provider = user.providerData && user.providerData[0]
+      ? user.providerData[0].providerId
+      : 'password';
+    const rows = [
+      ['Email', user.email || 'Unavailable'],
+      ['Provider', provider],
+      ['Firebase UID', user.uid || 'Unavailable'],
+      ['Auth domain', firebase?.app?.().options?.authDomain || 'Unavailable'],
+      ['Browser', navigator.userAgent],
+      ['App origin', window.location.origin],
+      ['Session', firebase?.auth?.().currentUser ? 'Authenticated' : 'Not detected']
+    ];
+    details.innerHTML = rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
+    modal.classList.add('is-open');
+  }
+
+  function closeAuthDebugDialog() {
+    document.getElementById('auth-debug-modal')?.classList.remove('is-open');
   }
 
   // ==========================================================
