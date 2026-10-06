@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="ScoreSheets" />
     <script src="/install.js?v=2" defer></script>
     <link rel="manifest" href="/manifest.json" />
-    <link rel="stylesheet" href="/styles.css?v=16" />
+    <link rel="stylesheet" href="/styles.css?v=17" />
   </head>
   <body class="splash-active">
     <!-- Branded Splash Screen (Settle the Score) -->
@@ -147,6 +147,19 @@
       <p>Keep ScoreSheets on your home screen and open it like an app.</p>
       <ol id="install-app-steps"></ol>
       <form method="dialog"><button class="btn btn-primary" autofocus>Got it</button></form>
+    </dialog>
+
+    <dialog id="add-players-dialog" class="players-dialog" aria-labelledby="add-players-title">
+      <form id="add-sheet-players-form">
+        <h3 id="add-players-title">Add players</h3>
+        <label for="add-sheet-player-names">Player names (one per line)</label>
+        <textarea id="add-sheet-player-names" class="form-input" rows="4" required placeholder="Alex&#10;Sam"></textarea>
+        <p>New players start with empty scores. Existing scores stay as they are.</p>
+        <div class="scorecard-actions">
+          <button type="button" class="btn btn-outline" id="btn-cancel-add-players">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add players</button>
+        </div>
+      </form>
     </dialog>
 
     <!-- Main Views Container -->
@@ -311,6 +324,7 @@
             <button type="button" class="btn btn-outline btn-sm" id="btn-wakelock-chip" aria-pressed="false" title="Keep the screen awake while this sheet is open">Keep app open</button>
             <button type="button" class="btn btn-outline btn-sm" id="btn-share-game">🔗 Share Match</button>
             <button type="button" class="btn btn-outline btn-sm" id="btn-back-to-home">🏠 All Sheets</button>
+            <button type="button" class="btn btn-outline btn-sm hidden" id="btn-add-sheet-players">➕ Add players</button>
             <button type="button" class="btn btn-danger btn-sm" id="btn-delete-current-game">🗑️ Delete</button>
           </div>
         </div>
@@ -664,7 +678,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=85"></script>
+    <script src="/app.js?v=86"></script>
   </body>
 </html>
 

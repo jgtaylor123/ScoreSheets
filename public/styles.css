@@ -2529,3 +2529,17 @@ body.splash-active {
   color: var(--accent-gold);
 }
 .recent-matches[open] > summary .section-title::before { content: '▾ '; }
+
+.players-dialog {
+  margin: auto;
+  width: min(420px, calc(100% - 32px));
+  padding: 1.5rem;
+  color: var(--text-main);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-fairway);
+  border-radius: var(--radius-md);
+}
+.players-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+.players-dialog label { display: block; margin: 1rem 0 0.5rem; }
+.players-dialog textarea { resize: vertical; }
+.players-dialog p { margin: 1rem 0; color: var(--text-muted); }

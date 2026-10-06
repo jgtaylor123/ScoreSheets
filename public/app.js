@@ -2359,6 +2359,45 @@
 
   // Match Details Drawer State
   let isDetailsDrawerOpen = false;
+  let addingPlayersToGameId = null;
+
+  function openAddPlayersDialog() {
+    if (!activeGame || activeGame.completed) return;
+    if (activeGame.isLiveChallenge) {
+      showToast('Live challenges use invited players. Add players to a regular score sheet instead.', 'info');
+      return;
+    }
+    addingPlayersToGameId = activeGame.id;
+    document.getElementById('add-sheet-player-names').value = '';
+    document.getElementById('add-players-dialog').showModal();
+    document.getElementById('add-sheet-player-names').focus();
+  }
+
+  async function addPlayersToSheet(event) {
+    event.preventDefault();
+    if (!activeGame || activeGame.id !== addingPlayersToGameId || activeGame.completed || activeGame.isLiveChallenge) {
+      document.getElementById('add-players-dialog').close();
+      return;
+    }
+    const names = document.getElementById('add-sheet-player-names').value.split(/\r?\n/).map(name => name.trim()).filter(Boolean);
+    if (!names.length) {
+      showToast('Enter at least one player name.', 'error');
+      return;
+    }
+    const game = activeGame;
+    names.forEach((name, index) => game.players.push({
+      id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10) + '_' + index,
+      uid: null,
+      name,
+      scores: Array(game.holes).fill(null),
+      cardDetails: Array(game.holes).fill(null)
+    }));
+    saveLastPlayerNames(game.players.map(player => player.name));
+    document.getElementById('add-players-dialog').close();
+    renderScorecard();
+    await saveGame(game, { syncToCloud: true });
+    showToast(names.length === 1 ? 'Player added.' : names.length + ' players added.', 'success');
+  }
 
   function toggleDetailsDrawer(forceState) {
     const chipsDrawer = document.getElementById('sc-meta-details');
@@ -2367,6 +2406,7 @@
     if (!chipsDrawer || !toggleBtn) return;
 
     isDetailsDrawerOpen = typeof forceState === 'boolean' ? forceState : !isDetailsDrawerOpen;
+    document.getElementById('btn-add-sheet-players')?.classList.toggle('hidden', !isDetailsDrawerOpen || !activeGame || activeGame.completed);
 
     if (isDetailsDrawerOpen) {
       chipsDrawer.classList.add('is-open');
@@ -3187,6 +3227,12 @@
 
     document.getElementById('btn-delete-current-game').addEventListener('click', () => {
       if (activeGame) deleteGame(activeGame.id);
+    });
+
+    document.getElementById('btn-add-sheet-players').addEventListener('click', openAddPlayersDialog);
+    document.getElementById('add-sheet-players-form').addEventListener('submit', addPlayersToSheet);
+    document.getElementById('btn-cancel-add-players').addEventListener('click', () => {
+      document.getElementById('add-players-dialog').close();
     });
 
     const toggleDetailsBtn = document.getElementById('btn-toggle-details');
