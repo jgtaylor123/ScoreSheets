@@ -2506,3 +2506,15 @@ body.splash-active {
 @media (max-width: 640px) {
   .header-actions #btn-install-app { width: 36px; }
 }
+
+.new-sheet-space { display: none; }
+@media (min-width: 641px) {
+  .new-sheet-break { display: none; }
+  .new-sheet-space { display: inline; }
+  .header-actions #btn-new-game-nav {
+    width: auto;
+    height: 40px;
+    padding: 0.55rem 1rem;
+  }
+  .header-actions #btn-install-app { height: 40px; }
+}
