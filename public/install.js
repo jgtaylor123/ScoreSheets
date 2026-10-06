@@ -5,12 +5,18 @@
   const dialog = document.getElementById('install-app-dialog');
   const standalone = () => navigator.standalone === true ||
     !!window.matchMedia?.('(display-mode: standalone)').matches;
-  const updateButton = () => { button.hidden = standalone(); };
+  const updateButton = () => {
+    button.hidden = false;
+    button.title = standalone() ? 'ScoreSheets app is installed' : 'Install ScoreSheets app';
+  };
 
   function showInstructions() {
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const steps = isIOS
+    document.getElementById('install-app-title').textContent = standalone() ? 'ScoreSheets is installed' : 'Install ScoreSheets';
+    const steps = standalone()
+      ? ['You’re already using the app version. Open ScoreSheets from your home screen whenever you want to play.']
+      : isIOS
       ? ['Open ScoreSheets in Safari.', 'Tap Share (or More, then Share), then Add to Home Screen.', 'Keep Open as Web App enabled if shown, then tap Add.']
       : /Android/.test(navigator.userAgent)
         ? ['Open ScoreSheets in Chrome.', 'Open the browser menu and choose Install app or Add to Home screen.', 'Confirm to add ScoreSheets to your home screen.']
@@ -26,7 +32,7 @@
   });
   window.addEventListener('appinstalled', () => {
     installPrompt = null;
-    button.hidden = true;
+    updateButton();
     if (dialog.open) dialog.close();
   });
   window.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', updateButton);
@@ -41,7 +47,7 @@
     try {
       await prompt.prompt();
       const choice = await prompt.userChoice;
-      if (choice.outcome === 'accepted') button.hidden = true;
+      if (choice.outcome === 'accepted') button.title = 'ScoreSheets installation requested';
     } catch (err) {
       showInstructions();
     } finally {

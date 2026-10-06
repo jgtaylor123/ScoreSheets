@@ -2449,6 +2449,6 @@ body.splash-active {
   #btn-auth-action { width: 96px; min-height: 36px; }
   #btn-install-app { width: 32px; height: 36px; padding: 0; }
 }
-@media (max-width: 380px) {
+@media (max-width: 400px) {
   .header .brand-text { display: none; }
 }

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'scoresheets-v59';
+const CACHE_NAME = 'scoresheets-v60';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/styles.css?v=8',
+  '/styles.css?v=9',
   '/app.js?v=81',
-  '/install.js?v=1',
+  '/install.js?v=2',
   '/icon.svg',
   '/icon-180.png',
   '/icon-192.png',
