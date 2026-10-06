@@ -2520,6 +2520,56 @@
     }).join('');
   }
 
+  let editingPlayerCtx = null;
+  let suppressHeaderClickUntil = 0;
+
+  function openEditPlayerDialog(playerId) {
+    if (!activeGame) return;
+    const player = activeGame.players.find(item => item.id === playerId);
+    if (!player) return;
+    editingPlayerCtx = { gameId: activeGame.id, playerId };
+    document.getElementById('edit-sheet-player-name').value = player.name;
+    const deleteButton = document.getElementById('btn-delete-sheet-player');
+    deleteButton.disabled = activeGame.players.length < 2 || !!activeGame.isLiveChallenge;
+    deleteButton.title = activeGame.isLiveChallenge
+      ? 'Live challenge players cannot be removed during a match.'
+      : activeGame.players.length < 2 ? 'A sheet needs at least one player.' : 'Remove this player and their scores';
+    document.getElementById('edit-player-dialog').showModal();
+    document.getElementById('edit-sheet-player-name').focus();
+  }
+
+  async function savePlayerName(event) {
+    event.preventDefault();
+    if (!editingPlayerCtx || !activeGame || editingPlayerCtx.gameId !== activeGame.id) return;
+    const player = activeGame.players.find(item => item.id === editingPlayerCtx.playerId);
+    const name = document.getElementById('edit-sheet-player-name').value.trim();
+    if (!player || !name) {
+      showToast('Enter a player name.', 'error');
+      return;
+    }
+    const game = activeGame;
+    player.name = name;
+    document.getElementById('edit-player-dialog').close();
+    renderScorecard();
+    saveLastPlayerNames(game.players.map(item => item.name));
+    await saveGame(game, { syncToCloud: true });
+    showToast('Player name updated.', 'success');
+  }
+
+  async function deletePlayerFromSheet() {
+    if (!editingPlayerCtx || !activeGame || editingPlayerCtx.gameId !== activeGame.id) return;
+    if (activeGame.players.length < 2 || activeGame.isLiveChallenge) return;
+    const player = activeGame.players.find(item => item.id === editingPlayerCtx.playerId);
+    if (!player || !confirm('Delete ' + player.name + ' and their scores from this sheet?')) return;
+    const game = activeGame;
+    game.players = game.players.filter(item => item.id !== player.id);
+    if (game.playerOrder) game.playerOrder = game.playerOrder.filter(id => id !== player.id);
+    document.getElementById('edit-player-dialog').close();
+    renderScorecard();
+    await saveGame(game, { syncToCloud: true });
+    showToast('Player deleted.', 'success');
+  }
+
   function orderedSheetPlayers(game) {
     const positions = new Map((game.playerOrder || []).map((id, index) => [id, index]));
     return [...game.players].sort((a, b) =>
@@ -2580,8 +2630,12 @@
         clearDrag();
         if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
         if (result.moved && activeGame && activeGame.id === result.gameId) {
+          suppressHeaderClickUntil = Date.now() + 350;
           movePlayerColumn(handle.dataset.playerId, result.target);
         }
+      });
+      handle.addEventListener('click', () => {
+        if (Date.now() >= suppressHeaderClickUntil) openEditPlayerDialog(handle.dataset.playerId);
       });
       handle.addEventListener('pointercancel', clearDrag);
       handle.addEventListener('lostpointercapture', clearDrag);
@@ -2610,7 +2664,7 @@
     // Headers
     let headHtml = `<th class="hole-col">${roundName}</th>`;
     players.forEach(p => {
-      headHtml += `<th data-player-id="${escapeHtml(p.id)}"><button type="button" class="player-column-handle" data-player-id="${escapeHtml(p.id)}" title="Drag left or right to reorder players" aria-label="Reorder ${escapeHtml(p.name)}: drag or use left and right arrow keys"><span aria-hidden="true" class="column-drag-grip">↔</span> ${escapeHtml(p.name)}</button></th>`;
+      headHtml += `<th data-player-id="${escapeHtml(p.id)}"><button type="button" class="player-column-handle" data-player-id="${escapeHtml(p.id)}" title="Tap to edit; drag left or right to reorder" aria-label="Edit ${escapeHtml(p.name)}; drag or use left and right arrow keys to reorder"><span aria-hidden="true" class="column-drag-grip">↔</span> ${escapeHtml(p.name)}</button></th>`;
     });
     theadRow.innerHTML = headHtml;
     bindPlayerColumnDragging(theadRow);
@@ -3305,6 +3359,12 @@
 
     document.getElementById('btn-delete-current-game').addEventListener('click', () => {
       if (activeGame) deleteGame(activeGame.id);
+    });
+
+    document.getElementById('edit-sheet-player-form').addEventListener('submit', savePlayerName);
+    document.getElementById('btn-delete-sheet-player').addEventListener('click', deletePlayerFromSheet);
+    document.getElementById('btn-cancel-edit-player').addEventListener('click', () => {
+      document.getElementById('edit-player-dialog').close();
     });
 
     document.getElementById('btn-add-sheet-players').addEventListener('click', openAddPlayersDialog);
