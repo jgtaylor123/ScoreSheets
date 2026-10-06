@@ -197,8 +197,10 @@
     }
   })();
   let wakeLockSentinel = null;
+  let wakeLockRequestPending = false;
 
   async function requestWakeLock() {
+    if (document.visibilityState !== 'visible' || wakeLockRequestPending) return;
     if (!('wakeLock' in navigator)) {
       updateWakeLockUI();
       return;
@@ -212,6 +214,7 @@
       return;
     }
 
+    wakeLockRequestPending = true;
     try {
       wakeLockSentinel = await navigator.wakeLock.request('screen');
       wakeLockSentinel.addEventListener('release', () => {
@@ -222,6 +225,8 @@
     } catch (err) {
       console.warn('Screen Wake Lock request note:', err && err.message);
       updateWakeLockUI();
+    } finally {
+      wakeLockRequestPending = false;
     }
   }
 
@@ -270,9 +275,7 @@
       chip.style.borderColor = 'var(--fairway-green)';
       chip.style.boxShadow = '0 0 10px rgba(34, 197, 94, 0.35)';
       chip.title = 'Screen will stay awake while viewing this sheet. Tap to turn OFF.';
-      if (!wakeLockSentinel || wakeLockSentinel.released) {
-        requestWakeLock();
-      }
+      // Rendering status must not trigger another wake-lock request.
     } else {
       chip.innerHTML = '💤 Stay Awake: <strong style="margin-left:3px; color:#94a3b8;">OFF</strong>';
       chip.style.background = 'rgba(255, 255, 255, 0.06)';
