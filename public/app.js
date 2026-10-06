@@ -1808,25 +1808,58 @@
     const wasProfileView = document.getElementById('view-profile')?.classList.contains('is-active');
     const wasManageSheetsView = document.getElementById('view-manage-sheets')?.classList.contains('is-active');
 
-    // Find and preserve game data in permanent stats storage before deleting from active list
-    const targetGame = getLocalGames().find(g => g.id === gameId) || gamesList.find(g => g.id === gameId);
-    if (targetGame) {
-      recordMatchForStats(targetGame);
+    const userId = currentUser && currentUser.uid;
+    // Removal belongs to the account, even for a shared sheet that this user
+    // cannot delete from the global games collection. Keep the match for stats.
+    if (userId) {
+      if (!db) {
+        showToast('Could not remove the sheet. Please reconnect and try again.', 'error');
+        return;
+      }
+      try {
+        await db.collection('users').doc(userId).collection('savedGames').doc(gameId)
+          .set({ id: gameId, removed: true }, { merge: true });
+      } catch (err) {
+        console.warn('Could not remove sheet from account history:', err);
+        showToast('Could not remove the sheet. Please reconnect and try again.', 'error');
+        return;
+      }
+      // The account may have changed while the request was pending.
+      if (userId !== (currentUser && currentUser.uid)) return;
     }
 
-    let localGames = getLocalGames().filter(g => g.id !== gameId);
-    saveLocalGames(localGames);
-
-    if (db) {
+    // Invalidate any list request started before removal, which may contain
+    // the old account history and would otherwise restore the card.
+    ++gamesListLoadId;
+    const targetGame = gamesList.find(g => g.id === gameId) || getLocalGames().find(g => g.id === gameId);
+    if (targetGame) recordMatchForStats(targetGame);
+    saveLocalGames(getLocalGames().filter(g => g.id !== gameId));
+    gamesList = gamesList.filter(g => g.id !== gameId);
+    if (userId) {
       try {
-        await db.collection('games').doc(gameId).delete();
-        if (currentUser) {
-          await db.collection('users').doc(currentUser.uid).collection('savedGames').doc(gameId).delete();
-        }
+        const cacheKey = LOCAL_STORAGE_KEY + '_account_' + userId;
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+        localStorage.setItem(cacheKey, JSON.stringify(cached.filter(g => g.id !== gameId)));
       } catch (err) {
-        console.warn('Firestore delete error:', err);
+        console.warn('Could not update account sheet cache:', err);
       }
     }
+
+    if (activeGame && activeGame.id === gameId) {
+      if (firestoreUnsubscribe) firestoreUnsubscribe();
+      firestoreUnsubscribe = null;
+      if (liveRefreshTimer) clearInterval(liveRefreshTimer);
+      liveRefreshTimer = null;
+      activeGame = null;
+    }
+    try {
+      if (localStorage.getItem('scoresheets_last_opened_game_id') === gameId) {
+        localStorage.removeItem('scoresheets_last_opened_game_id');
+      }
+      if (new URLSearchParams(window.location.search).get('game') === gameId) {
+        window.history.replaceState({}, '', window.location.origin + window.location.pathname);
+      }
+    } catch (err) {}
 
     showToast('Match removed from history (stats preserved)', 'info');
     await loadGamesList();
@@ -1871,8 +1904,10 @@
         owned.forEach(doc => gameMap.set(doc.id, doc.data()));
         participating.forEach(doc => gameMap.set(doc.id, doc.data()));
         const savedIds = [];
+        const removedIds = new Set();
         saved.forEach(doc => {
-          if (!gameMap.has(doc.id)) savedIds.push(doc.id);
+          if (doc.data().removed === true) removedIds.add(doc.id);
+          else if (!gameMap.has(doc.id)) savedIds.push(doc.id);
         });
         const shared = await Promise.all(savedIds.map(id => collection.doc(id).get({ source: 'server' })));
         shared.forEach(doc => {
@@ -1887,6 +1922,7 @@
             gameMap.set(game.id, game);
           }
         });
+        removedIds.forEach(id => gameMap.delete(id));
         games = [...gameMap.values()].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
         if (loadId !== gamesListLoadId || userId !== (currentUser && currentUser.uid)) return;
         try {

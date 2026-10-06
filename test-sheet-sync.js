@@ -2,21 +2,28 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = false, cache = [] } = {}) {
+function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = false, cache = [], removeFails = false } = {}) {
   const storage = new Map([
     ['scoresheets_saved_matches', JSON.stringify(local)],
     ['scoresheets_saved_matches_account_' + uid, JSON.stringify(cache)],
   ]);
   let rendered;
   const queries = [];
+  const toasts = [];
   const snapshot = games => ({ forEach: fn => games.forEach(game => fn({ id: game.id, data: () => game })) });
   const db = {
     collection(name) {
       if (name === 'users') return { doc: () => ({ collection: () => ({
         get: async () => {
           if (offline) throw Error('offline');
-          return snapshot(saved.map(id => ({ id })));
+          return snapshot(saved.map(item => typeof item === 'string' ? { id: item } : item));
         },
+        doc: id => ({ set: async data => {
+          if (removeFails) throw Error('permission-denied');
+          const index = saved.findIndex(item => (typeof item === 'string' ? item : item.id) === id);
+          if (index >= 0) saved[index] = { id, ...data };
+          else saved.push({ id, ...data });
+        } }),
       }) }) };
       assert.equal(name, 'games');
       return {
@@ -37,9 +44,10 @@ function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = fals
     },
   };
   const context = {
-    localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) },
+    localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
     document: { getElementById: () => ({ innerHTML: '', classList: { contains: () => false } }) },
-    console: { warn() {} }, dbStub: db, userStub: uid ? { uid } : null,
+    console: { warn() {} }, confirm: () => true, URLSearchParams,
+    window: { location: { search: '' } }, toast: (...args) => toasts.push(args), dbStub: db, userStub: uid ? { uid } : null,
     rendered: games => { rendered = games; },
   };
   let source = fs.readFileSync('public/app.js', 'utf8');
@@ -47,10 +55,14 @@ function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = fals
     db = dbStub;
     currentUser = userStub;
     renderGamesList = rendered;
+    showToast = toast;
+    recordMatchForStats = () => {};
+    showView = () => {};
     globalThis.load = loadGamesList;
+    globalThis.remove = deleteGame;
   })();`;
   vm.runInNewContext(source, context);
-  return { load: context.load, games: () => rendered, storage, queries };
+  return { load: context.load, remove: context.remove, toasts, games: () => rendered, storage, queries };
 }
 const game = (id, extra = {}) => ({ id, createdBy: 'owner', completed: false, updatedAt: '2026-10-01T00:00:00Z', ...extra });
 (async () => {
@@ -80,5 +92,26 @@ const game = (id, extra = {}) => ({ id, createdBy: 'owner', completed: false, up
   const edits = app({ local: [newer], cloud });
   await edits.load();
   assert.equal(edits.games().find(g => g.id === newer.id).score, 17, 'Preserve newer offline edits on existing sheets');
-  console.log('Account sheet sync tests passed.');
+  const sharedSaved = ['shared'];
+  const removal = app({ local: [game('shared')], cloud: [game('shared', { createdBy: 'other' })], saved: sharedSaved, cache: [game('shared')] });
+  await removal.load();
+  assert.equal(removal.games().length, 1);
+  await removal.remove('shared');
+  assert.equal(removal.games().length, 0, 'The last sheet must disappear after removal');
+  assert.equal(JSON.parse(removal.storage.get('scoresheets_saved_matches_account_owner')).length, 0, 'Clear account cache too');
+  await removal.load();
+  assert.equal(removal.games().length, 0, 'Refresh must not revive the removed sheet');
+  const secondDevice = app({ local: [game('shared')], cloud: [game('shared', { createdBy: 'other' })], saved: sharedSaved });
+  await secondDevice.load();
+  assert.equal(secondDevice.games().length, 0, 'Removal must follow the account across devices');
+  const ownedRemoval = app({ cloud: [game('owned')], saved: [{ id: 'owned', removed: true }] });
+  await ownedRemoval.load();
+  assert.equal(ownedRemoval.games().length, 0, 'Owned query must also respect removal');
+  const denied = app({ local: [game('owned')], cloud: [game('owned')], removeFails: true });
+  await denied.load();
+  await denied.remove('owned');
+  assert.equal(denied.games().length, 1, 'A failed request must preserve the sheet');
+  assert.equal(JSON.parse(denied.storage.get('scoresheets_saved_matches')).length, 1);
+  assert.equal(denied.toasts.at(-1)[1], 'error', 'Do not report success for a rejected removal');
+  console.log('Account sheet sync and removal tests passed.');
 })().catch(err => { console.error(err); process.exitCode = 1; });
