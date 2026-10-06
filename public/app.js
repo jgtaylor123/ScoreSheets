@@ -525,7 +525,7 @@
 
       const name = currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'My Profile');
       if (authActionBtn) {
-        authActionBtn.textContent = '👤 ' + name;
+        authActionBtn.innerHTML = '<span aria-hidden="true">👤</span><span class="account-name">' + escapeHtml(name) + '</span>';
         authActionBtn.title = 'View Profile & Stats (' + (currentUser.email || name) + ')';
       }
       if (signedOutPane) signedOutPane.style.display = 'none';
@@ -537,7 +537,7 @@
       if (activeSheetsSection) activeSheetsSection.classList.remove('hidden');
     } else {
       if (authActionBtn) {
-        authActionBtn.textContent = '👤 Sign In';
+        authActionBtn.innerHTML = '<span aria-hidden="true">👤</span><span class="account-name">Sign In</span>';
         authActionBtn.title = 'Sign in or create account';
       }
       if (signedOutPane) signedOutPane.style.display = 'block';

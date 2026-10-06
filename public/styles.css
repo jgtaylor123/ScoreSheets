@@ -2409,3 +2409,46 @@ body.splash-active {
     padding: 1.25rem 1rem;
   }
 }
+
+/* Compact account and installation controls */
+#btn-auth-action {
+  max-width: 170px;
+  white-space: normal;
+  text-align: left;
+}
+.account-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.15;
+}
+#btn-install-app {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex-shrink: 0;
+}
+#btn-install-app[hidden] { display: none; }
+#install-app-dialog {
+  margin: auto;
+  width: min(420px, calc(100% - 32px));
+  padding: 1.5rem;
+  color: var(--text-main);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-fairway);
+  border-radius: var(--radius-md);
+}
+#install-app-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+#install-app-dialog p { margin: 1rem 0; }
+#install-app-dialog ol { padding-left: 1.4rem; margin-bottom: 1.25rem; }
+#install-app-dialog li { margin: 0.65rem 0; }
+@media (max-width: 640px) {
+  #btn-auth-action { width: 96px; min-height: 36px; }
+  #btn-install-app { width: 32px; height: 36px; padding: 0; }
+}
+@media (max-width: 380px) {
+  .header .brand-text { display: none; }
+}
