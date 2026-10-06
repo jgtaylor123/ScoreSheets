@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const chip = { style: {} };
+const chip = { style: {}, setAttribute() {} };
 const document = { visibilityState: 'visible', getElementById: () => chip };
 let attempts = 0;
 let rejectRequest = true;
@@ -18,6 +18,9 @@ const context = {
 };
 let source = fs.readFileSync('public/app.js', 'utf8');
 source = source.slice(0, source.indexOf('  // Service Worker for Offline PWA Support')) + `
+  currentViewId = 'view-scorecard';
+  isWakeLockEnabled = true;
+  globalThis.setView = id => { currentViewId = id; };
   globalThis.request = requestWakeLock;
   globalThis.update = updateWakeLockUI;
 })();`;
@@ -40,5 +43,8 @@ vm.runInNewContext(source, context);
   document.visibilityState = 'visible';
   await context.request();
   assert.equal(attempts, 3, 'Foreground interaction can acquire the lock again');
-  console.log('Wake lock background/rejection tests passed.');
+  context.setView('view-home');
+  await context.request();
+  assert.equal(attempts, 3, 'The sheet list must never acquire a wake lock');
+  console.log('Wake lock background/rejection and sheet-only tests passed.');
 })().catch(err => { console.error(err); process.exitCode = 1; });

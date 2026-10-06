@@ -186,21 +186,15 @@
     directScore: 0
   };
 
-  // Screen Wake Lock State (Defaults to ON, persisted in localStorage, togglable)
-  const WAKE_LOCK_PREF_KEY = 'scoresheets_wake_lock_enabled';
-  let isWakeLockEnabled = (function() {
-    try {
-      const stored = localStorage.getItem(WAKE_LOCK_PREF_KEY);
-      return stored === null ? true : stored === 'true';
-    } catch (e) {
-      return true; // Default ON
-    }
-  })();
+  // Keeping the screen awake is an opt-in choice for each sheet this session.
+  let currentViewId = 'view-home';
+  const awakeSheetIds = new Set();
+  let isWakeLockEnabled = false;
   let wakeLockSentinel = null;
   let wakeLockRequestPending = false;
 
   async function requestWakeLock() {
-    if (document.visibilityState !== 'visible' || wakeLockRequestPending) return;
+    if (currentViewId !== 'view-scorecard' || document.visibilityState !== 'visible' || wakeLockRequestPending) return;
     if (!('wakeLock' in navigator)) {
       updateWakeLockUI();
       return;
@@ -217,6 +211,10 @@
     wakeLockRequestPending = true;
     try {
       wakeLockSentinel = await navigator.wakeLock.request('screen');
+      if (currentViewId !== 'view-scorecard' || document.visibilityState !== 'visible' || !isWakeLockEnabled) {
+        await releaseWakeLock();
+        return;
+      }
       wakeLockSentinel.addEventListener('release', () => {
         wakeLockSentinel = null;
         updateWakeLockUI();
@@ -246,9 +244,10 @@
       return;
     }
     isWakeLockEnabled = !isWakeLockEnabled;
-    try {
-      localStorage.setItem(WAKE_LOCK_PREF_KEY, String(isWakeLockEnabled));
-    } catch (e) {}
+    if (activeGame) {
+      if (isWakeLockEnabled) awakeSheetIds.add(activeGame.id);
+      else awakeSheetIds.delete(activeGame.id);
+    }
 
     if (isWakeLockEnabled) {
       await requestWakeLock();
@@ -268,8 +267,9 @@
       return;
     }
     chip.style.display = 'inline-flex';
+    chip.setAttribute('aria-pressed', String(isWakeLockEnabled));
     if (isWakeLockEnabled) {
-      chip.innerHTML = '🔆 Stay Awake: <strong style="margin-left:3px; color:#4ade80;">ON</strong>';
+      chip.textContent = '🔆 Keep app open: On';
       chip.style.background = 'rgba(34, 197, 94, 0.2)';
       chip.style.color = '#ffffff';
       chip.style.borderColor = 'var(--fairway-green)';
@@ -277,7 +277,7 @@
       chip.title = 'Screen will stay awake while viewing this sheet. Tap to turn OFF.';
       // Rendering status must not trigger another wake-lock request.
     } else {
-      chip.innerHTML = '💤 Stay Awake: <strong style="margin-left:3px; color:#94a3b8;">OFF</strong>';
+      chip.textContent = 'Keep app open';
       chip.style.background = 'rgba(255, 255, 255, 0.06)';
       chip.style.color = 'var(--text-muted)';
       chip.style.borderColor = 'rgba(255, 255, 255, 0.12)';
@@ -500,6 +500,9 @@
   // ==========================================================
 
   function showView(viewId) {
+    currentViewId = viewId;
+    if (viewId !== 'view-scorecard') releaseWakeLock();
+    else if (isWakeLockEnabled) requestWakeLock();
     document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
     const target = document.getElementById(viewId);
     if (target) {
@@ -2256,7 +2259,10 @@
   // ==========================================================
 
   function openGame(game) {
+    if (activeGame && activeGame.id !== game.id) releaseWakeLock();
     activeGame = game;
+    isWakeLockEnabled = awakeSheetIds.has(game.id);
+    updateWakeLockUI();
 
     if (firestoreUnsubscribe) {
       firestoreUnsubscribe();

@@ -301,11 +301,11 @@
                 <span class="meta-pill" id="sc-win-condition-chip">Lowest Score Wins</span>
                 <span class="meta-pill completed" id="sc-status-chip">In Progress</span>
                 <span class="meta-pill" id="sc-sync-chip" style="background: rgba(59, 130, 246, 0.18); color: #93c5fd;">⚡ Offline Mode</span>
-                <button type="button" class="meta-pill" id="btn-wakelock-chip" style="cursor: pointer; border: 1px solid transparent;" title="Tap to toggle Screen Stay Awake">🔆 Screen Kept Awake</button>
               </div>
             </div>
           </div>
           <div class="scorecard-actions">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-wakelock-chip" aria-pressed="false" title="Keep the screen awake while this sheet is open">Keep app open</button>
             <button type="button" class="btn btn-outline btn-sm" id="btn-share-game">🔗 Share Match</button>
             <button type="button" class="btn btn-outline btn-sm" id="btn-back-to-home">🏠 All Sheets</button>
             <button type="button" class="btn btn-danger btn-sm" id="btn-delete-current-game">🗑️ Delete</button>
@@ -661,7 +661,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
     <!-- Main ScoreSheets Logic -->
-    <script src="/app.js?v=82"></script>
+    <script src="/app.js?v=83"></script>
   </body>
 </html>
 
