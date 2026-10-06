@@ -2543,3 +2543,22 @@ body.splash-active {
 .players-dialog label { display: block; margin: 1rem 0 0.5rem; }
 .players-dialog textarea { resize: vertical; }
 .players-dialog p { margin: 1rem 0; color: var(--text-muted); }
+
+.player-column-handle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  padding: 0.4rem 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.player-column-handle:active { cursor: grabbing; }
+.player-column-handle:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 3px; }
+.column-drag-grip { color: var(--text-muted); font-size: 0.8em; }
+.score-table th.is-dragging { opacity: 0.65; }
+.score-table th.is-drop-target { box-shadow: inset 0 -3px var(--accent-gold); background: rgba(245, 158, 11, 0.15); }

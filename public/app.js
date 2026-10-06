@@ -2520,6 +2520,82 @@
     }).join('');
   }
 
+  function orderedSheetPlayers(game) {
+    const positions = new Map((game.playerOrder || []).map((id, index) => [id, index]));
+    return [...game.players].sort((a, b) =>
+      (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity));
+  }
+
+  async function movePlayerColumn(playerId, targetIndex) {
+    if (!activeGame) return;
+    const game = activeGame;
+    const players = orderedSheetPlayers(game);
+    const from = players.findIndex(player => player.id === playerId);
+    if (from < 0 || targetIndex < 0 || targetIndex >= players.length || from === targetIndex) return;
+    const [player] = players.splice(from, 1);
+    players.splice(targetIndex, 0, player);
+    // Display order is separate from player identity and live-game turn order.
+    game.playerOrder = players.map(item => item.id);
+    renderScoreTable();
+    await saveGame(game, { syncToCloud: true });
+  }
+
+  function bindPlayerColumnDragging(row) {
+    row.querySelectorAll('.player-column-handle').forEach(handle => {
+      let drag = null;
+      const clearDrag = () => {
+        row.querySelectorAll('th').forEach(th => th.classList.remove('is-dragging', 'is-drop-target'));
+        drag = null;
+      };
+      handle.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || activeGame.players.length < 2) return;
+        drag = { pointerId: event.pointerId, gameId: activeGame.id, startX: event.clientX, moved: false, target: -1 };
+        handle.setPointerCapture(event.pointerId);
+      });
+      handle.addEventListener('pointermove', event => {
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        if (!drag.moved && Math.abs(event.clientX - drag.startX) < 6) return;
+        drag.moved = true;
+        event.preventDefault();
+        const scroller = row.closest('.table-responsive');
+        const bounds = scroller.getBoundingClientRect();
+        if (event.clientX > bounds.right - 32) scroller.scrollLeft += 16;
+        else if (event.clientX < bounds.left + 32) scroller.scrollLeft -= 16;
+        const headers = [...row.querySelectorAll('th[data-player-id]')];
+        let nearest = 0;
+        let distance = Infinity;
+        headers.forEach((header, index) => {
+          const rect = header.getBoundingClientRect();
+          const delta = Math.abs(event.clientX - (rect.left + rect.width / 2));
+          if (delta < distance) { nearest = index; distance = delta; }
+          header.classList.remove('is-drop-target');
+        });
+        drag.target = nearest;
+        handle.closest('th').classList.add('is-dragging');
+        headers[nearest].classList.add('is-drop-target');
+      });
+      handle.addEventListener('pointerup', event => {
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        const result = drag;
+        clearDrag();
+        if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+        if (result.moved && activeGame && activeGame.id === result.gameId) {
+          movePlayerColumn(handle.dataset.playerId, result.target);
+        }
+      });
+      handle.addEventListener('pointercancel', clearDrag);
+      handle.addEventListener('lostpointercapture', clearDrag);
+      handle.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+        event.preventDefault();
+        const id = handle.dataset.playerId;
+        const index = orderedSheetPlayers(activeGame).findIndex(player => player.id === id);
+        movePlayerColumn(id, index + (event.key === 'ArrowLeft' ? -1 : 1));
+        [...row.querySelectorAll('.player-column-handle')].find(button => button.dataset.playerId === id)?.focus();
+      });
+    });
+  }
+
   function renderScoreTable() {
     const theadRow = document.getElementById('score-table-head-row');
     const tbody = document.getElementById('score-table-body');
@@ -2529,20 +2605,22 @@
     const gameConfig = GAMES_REGISTRY[gType] || GAMES_REGISTRY.golf;
     const roundName = gameConfig.roundName || 'Round';
     const liveScoreLocked = activeGame.isLiveChallenge;
+    const players = orderedSheetPlayers(activeGame);
 
     // Headers
     let headHtml = `<th class="hole-col">${roundName}</th>`;
-    activeGame.players.forEach(p => {
-      headHtml += `<th>${escapeHtml(p.name)}</th>`;
+    players.forEach(p => {
+      headHtml += `<th data-player-id="${escapeHtml(p.id)}"><button type="button" class="player-column-handle" data-player-id="${escapeHtml(p.id)}" title="Drag left or right to reorder players" aria-label="Reorder ${escapeHtml(p.name)}: drag or use left and right arrow keys"><span aria-hidden="true" class="column-drag-grip">↔</span> ${escapeHtml(p.name)}</button></th>`;
     });
     theadRow.innerHTML = headHtml;
+    bindPlayerColumnDragging(theadRow);
 
     // Body Rows
     let bodyHtml = '';
     for (let h = 0; h < activeGame.holes; h++) {
       const roundNum = h + 1;
       bodyHtml += `<tr><td class="hole-col">${roundName} ${roundNum}</td>`;
-      activeGame.players.forEach(p => {
+      players.forEach(p => {
         const score = p.scores[h];
         const hasScore = score !== null && score !== undefined;
         let scoreClass = 'score-cell-btn';
@@ -2568,7 +2646,7 @@
 
     // Footer Totals Row
     let footHtml = '<td class="hole-col">TOTAL</td>';
-    activeGame.players.forEach(p => {
+    players.forEach(p => {
       const total = p.scores.reduce((acc, s) => s !== null ? acc + s : acc, 0);
       footHtml += `<td class="total-col">${total}</td>`;
     });
