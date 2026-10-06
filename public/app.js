@@ -188,6 +188,7 @@
 
   // Keeping the screen awake is an opt-in choice for each sheet this session.
   let currentViewId = 'view-home';
+  let profileReturnViewId = 'view-home';
   const awakeSheetIds = new Set();
   let isWakeLockEnabled = false;
   let wakeLockSentinel = null;
@@ -2883,10 +2884,22 @@
     }
   }
 
+  function closeProfileView() {
+    const returnView = profileReturnViewId === 'view-scorecard' && !activeGame
+      ? 'view-home' : profileReturnViewId;
+    showView(returnView);
+    if (returnView === 'view-home') loadGamesList();
+  }
+
   function openProfileOrSignIn() {
     if (currentUser || (auth && auth.currentUser)) {
       currentUser = currentUser || auth.currentUser;
-      renderProfileView();
+      if (currentViewId === 'view-profile') {
+        closeProfileView();
+      } else {
+        profileReturnViewId = currentViewId;
+        renderProfileView();
+      }
     } else {
       openSignInModal();
     }
@@ -3226,10 +3239,7 @@
     // Profile Page Back & Log Out actions
     const profileBackBtn = document.getElementById('btn-profile-back');
     if (profileBackBtn) {
-      profileBackBtn.addEventListener('click', () => {
-        loadGamesList();
-        showView('view-home');
-      });
+      profileBackBtn.addEventListener('click', closeProfileView);
     }
 
     const profileLogoutBtn = document.getElementById('btn-profile-logout');
