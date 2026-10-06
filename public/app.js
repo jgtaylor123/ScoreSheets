@@ -161,6 +161,7 @@
   let currentUser = null;
   let activeGame = null;
   let gamesList = [];
+  let gamesListLoadId = 0;
   let db = null;
   let auth = null;
   let authReady = Promise.resolve();
@@ -1700,7 +1701,7 @@
   }
 
   async function saveGame(game, options = {}) {
-    const { syncToCloud = false } = options;
+    const { syncToCloud = true } = options;
     game.updatedAt = new Date().toISOString();
 
     // Compute and record final tally & winner for posterity when marked complete
@@ -1736,7 +1737,7 @@
     }
     saveLocalGames(localGames);
 
-    // Only make network Firestore request when syncToCloud is true (game creation, finalization, resume, delete)
+    // Sync edits as well as creation and completion so other devices see current scores.
     if (syncToCloud && db) {
       try {
         const cloudGame = JSON.parse(JSON.stringify(game));
@@ -1840,30 +1841,73 @@
   }
 
   async function loadGamesList() {
+    const loadId = ++gamesListLoadId;
+    const userId = currentUser && currentUser.uid;
     const listContainer = document.getElementById('games-list-container');
     listContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Loading matches...</div>';
 
-    let games = getLocalGames();
-
-    if (db) {
+    const localGames = getLocalGames();
+    const cacheKey = userId ? LOCAL_STORAGE_KEY + '_account_' + userId : null;
+    let games = localGames;
+    if (userId) {
+      // The account cache contains only sheets confirmed for this account.
+      // Keep the original device history intact, including guest/offline sheets.
       try {
-        const snap = await db.collection('games').orderBy('updatedAt', 'desc').limit(25).get();
-        const firestoreGames = [];
-        snap.forEach(doc => firestoreGames.push(doc.data()));
-        if (firestoreGames.length > 0) {
-          const gameMap = {};
-          games.forEach(g => { gameMap[g.id] = g; });
-          firestoreGames.forEach(g => { gameMap[g.id] = g; });
-          games = Object.values(gameMap).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-          saveLocalGames(games);
-        }
+        games = JSON.parse(localStorage.getItem(cacheKey) || '[]');
       } catch (err) {
-        console.warn('Could not fetch Firestore matches:', err);
+        games = [];
       }
     }
 
+    if (db && userId) {
+      try {
+        const collection = db.collection('games');
+        const [owned, participating, saved] = await Promise.all([
+          collection.where('createdBy', '==', userId).get({ source: 'server' }),
+          collection.where('participantUids', 'array-contains', userId).get({ source: 'server' }),
+          db.collection('users').doc(userId).collection('savedGames').get({ source: 'server' })
+        ]);
+        const gameMap = new Map();
+        owned.forEach(doc => gameMap.set(doc.id, doc.data()));
+        participating.forEach(doc => gameMap.set(doc.id, doc.data()));
+        const savedIds = [];
+        saved.forEach(doc => {
+          if (!gameMap.has(doc.id)) savedIds.push(doc.id);
+        });
+        const shared = await Promise.all(savedIds.map(id => collection.doc(id).get({ source: 'server' })));
+        shared.forEach(doc => {
+          if (doc.exists) gameMap.set(doc.id, doc.data());
+        });
+
+        // Never revive deleted cloud sheets by merging the entire device cache.
+        // Retain newer offline edits only for sheets that still exist in cloud.
+        localGames.forEach(game => {
+          const cloud = gameMap.get(game.id);
+          if (cloud && new Date(game.updatedAt) > new Date(cloud.updatedAt)) {
+            gameMap.set(game.id, game);
+          }
+        });
+        games = [...gameMap.values()].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        if (loadId !== gamesListLoadId || userId !== (currentUser && currentUser.uid)) return;
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(games));
+        } catch (err) {
+          console.warn('Could not cache account sheets:', err);
+        }
+        const localMap = new Map(localGames.map(game => [game.id, game]));
+        games.forEach(game => localMap.set(game.id, game));
+        saveLocalGames([...localMap.values()]);
+      } catch (err) {
+        console.warn('Could not fetch account sheets; using account cache:', err);
+      }
+    }
+
+    if (loadId !== gamesListLoadId || userId !== (currentUser && currentUser.uid)) return;
     gamesList = games;
     renderGamesList(games);
+    if (document.getElementById('view-manage-sheets')?.classList.contains('is-active')) {
+      renderManageSheetsTable(games);
+    }
   }
 
   // Sort rankings considering the special 100-points Golf rule
@@ -2680,8 +2724,8 @@
     }
 
     try {
-      // Save locally (offline-first during match; if reactivated, sync state)
-      await saveGame(activeGame, { syncToCloud: wasCompleted || activeGame.isLiveChallenge });
+      // Save locally first and sync each score edit across devices
+      await saveGame(activeGame, { syncToCloud: true });
     } catch (err) {
       console.warn('Error saving local score:', err);
     }
@@ -2713,8 +2757,8 @@
     }
 
     try {
-      // Save locally (offline-first during match; if reactivated, sync state)
-      await saveGame(activeGame, { syncToCloud: wasCompleted || activeGame.isLiveChallenge });
+      // Save locally first and sync each score edit across devices
+      await saveGame(activeGame, { syncToCloud: true });
     } catch (err) {
       console.warn('Error clearing score:', err);
     }
@@ -3174,8 +3218,9 @@
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && isWakeLockEnabled) {
-        requestWakeLock();
+      if (document.visibilityState === 'visible') {
+        if (isWakeLockEnabled) requestWakeLock();
+        loadGamesList();
       }
     });
 
