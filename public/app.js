@@ -1880,11 +1880,18 @@
     }
   }
 
+  function withSheetLoadTimeout(request) {
+    let timer;
+    const timeout = new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('Sheet sync timed out')), 8000);
+    });
+    return Promise.race([request, timeout]).finally(() => clearTimeout(timer));
+  }
+
   async function loadGamesList() {
     const loadId = ++gamesListLoadId;
     const userId = currentUser && currentUser.uid;
-    const listContainer = document.getElementById('games-list-container');
-    listContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Loading matches...</div>';
+    const syncStatus = document.getElementById('sheet-sync-status');
 
     const localGames = getLocalGames();
     const cacheKey = userId ? LOCAL_STORAGE_KEY + '_account_' + userId : null;
@@ -1899,14 +1906,22 @@
       }
     }
 
+    // Render local account data before waiting for a mobile connection.
+    gamesList = games;
+    renderGamesList(games);
+    if (syncStatus) {
+      syncStatus.hidden = !(db && userId);
+      syncStatus.textContent = 'Checking for the latest sheets…';
+    }
+
     if (db && userId) {
       try {
         const collection = db.collection('games');
-        const [owned, participating, saved] = await Promise.all([
+        const [owned, participating, saved] = await withSheetLoadTimeout(Promise.all([
           collection.where('createdBy', '==', userId).get({ source: 'server' }),
           collection.where('participantUids', 'array-contains', userId).get({ source: 'server' }),
           db.collection('users').doc(userId).collection('savedGames').get({ source: 'server' })
-        ]);
+        ]));
         const gameMap = new Map();
         owned.forEach(doc => gameMap.set(doc.id, doc.data()));
         participating.forEach(doc => gameMap.set(doc.id, doc.data()));
@@ -1916,7 +1931,7 @@
           if (doc.data().removed === true) removedIds.add(doc.id);
           else if (!gameMap.has(doc.id)) savedIds.push(doc.id);
         });
-        const shared = await Promise.all(savedIds.map(id => collection.doc(id).get({ source: 'server' })));
+        const shared = await withSheetLoadTimeout(Promise.all(savedIds.map(id => collection.doc(id).get({ source: 'server' }))));
         shared.forEach(doc => {
           if (doc.exists) gameMap.set(doc.id, doc.data());
         });
@@ -1940,8 +1955,16 @@
         const localMap = new Map(localGames.map(game => [game.id, game]));
         games.forEach(game => localMap.set(game.id, game));
         saveLocalGames([...localMap.values()]);
+        if (syncStatus) syncStatus.hidden = true;
       } catch (err) {
+        if (loadId !== gamesListLoadId || userId !== (currentUser && currentUser.uid)) return;
         console.warn('Could not fetch account sheets; using account cache:', err);
+        if (syncStatus) {
+          syncStatus.hidden = false;
+          syncStatus.textContent = games.length
+            ? 'Showing saved sheets. Could not sync right now — tap Refresh to retry.'
+            : 'Could not load your sheets right now. Check your connection and tap Refresh to retry.';
+        }
       }
     }
 

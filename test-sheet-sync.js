@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = false, cache = [], removeFails = false } = {}) {
+function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = false, cache = [], removeFails = false, stalled = false } = {}) {
   const storage = new Map([
     ['scoresheets_saved_matches', JSON.stringify(local)],
     ['scoresheets_saved_matches_account_' + uid, JSON.stringify(cache)],
@@ -31,6 +31,7 @@ function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = fals
           queries.push([field, operator, value]);
           return { get: async options => {
             assert.equal(options.source, 'server');
+            if (stalled) return new Promise(() => {});
             if (offline) throw Error('offline');
             return snapshot(cloud.filter(game => operator === '=='
               ? game[field] === value : (game[field] || []).includes(value)));
@@ -43,9 +44,11 @@ function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = fals
       };
     },
   };
+  const status = {};
   const context = {
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
-    document: { getElementById: () => ({ innerHTML: '', classList: { contains: () => false } }) },
+    document: { getElementById: id => id === 'sheet-sync-status' ? status : ({ innerHTML: '', classList: { contains: () => false } }) },
+    setTimeout: fn => setTimeout(fn, 20), clearTimeout,
     console: { warn() {} }, confirm: () => true, URLSearchParams,
     window: { location: { search: '' } }, toast: (...args) => toasts.push(args), dbStub: db, userStub: uid ? { uid } : null,
     rendered: games => { rendered = games; },
@@ -62,7 +65,7 @@ function app({ local = [], cloud = [], saved = [], uid = 'owner', offline = fals
     globalThis.remove = deleteGame;
   })();`;
   vm.runInNewContext(source, context);
-  return { load: context.load, remove: context.remove, toasts, games: () => rendered, storage, queries };
+  return { status, load: context.load, remove: context.remove, toasts, games: () => rendered, storage, queries };
 }
 const game = (id, extra = {}) => ({ id, createdBy: 'owner', completed: false, updatedAt: '2026-10-01T00:00:00Z', ...extra });
 (async () => {
@@ -113,5 +116,13 @@ const game = (id, extra = {}) => ({ id, createdBy: 'owner', completed: false, up
   assert.equal(denied.games().length, 1, 'A failed request must preserve the sheet');
   assert.equal(JSON.parse(denied.storage.get('scoresheets_saved_matches')).length, 1);
   assert.equal(denied.toasts.at(-1)[1], 'error', 'Do not report success for a rejected removal');
-  console.log('Account sheet sync and removal tests passed.');
+  const stalled = app({ stalled: true, cache: [game('cached-sheet')] });
+  const loading = stalled.load();
+  assert.equal(stalled.games()[0].id, 'cached-sheet', 'Cached sheets must render before cloud responds');
+  await loading;
+  assert(stalled.status.textContent.includes('Refresh'), 'Stalled requests must resolve to retry guidance');
+  const noCache = app({ stalled: true });
+  await noCache.load();
+  assert(noCache.status.textContent.includes('Could not load'), 'First-time devices need a clear error instead of endless loading');
+  console.log('Account sheet sync, removal and timeout tests passed.');
 })().catch(err => { console.error(err); process.exitCode = 1; });
