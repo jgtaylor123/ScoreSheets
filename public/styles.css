@@ -2461,7 +2461,7 @@ body.splash-active {
   #btn-new-game-nav { min-height: 36px; }
 }
 
-/* Keep the install and New Sheet controls the same size. */
+/* Keep install and New Sheet controls the same height. */
 .header-actions #btn-install-app,
 .header-actions #btn-new-game-nav {
   width: 72px;
@@ -2499,4 +2499,11 @@ body.splash-active {
 .header .brand-badge,
 .header .brand-text p {
   display: none;
+}
+
+.header-actions #btn-install-app {
+  width: 40px;
+}
+@media (max-width: 640px) {
+  .header-actions #btn-install-app { width: 36px; }
 }
