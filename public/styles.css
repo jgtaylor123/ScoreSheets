@@ -2452,3 +2452,11 @@ body.splash-active {
 @media (max-width: 400px) {
   .header .brand-text { display: none; }
 }
+
+#btn-new-game-nav .new-sheet-label {
+  line-height: 1.15;
+  text-align: left;
+}
+@media (max-width: 640px) {
+  #btn-new-game-nav { min-height: 36px; }
+}
