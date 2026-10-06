@@ -2664,7 +2664,7 @@
     // Headers
     let headHtml = `<th class="hole-col">${roundName}</th>`;
     players.forEach(p => {
-      headHtml += `<th data-player-id="${escapeHtml(p.id)}"><button type="button" class="player-column-handle" data-player-id="${escapeHtml(p.id)}" title="Tap to edit; drag left or right to reorder" aria-label="Edit ${escapeHtml(p.name)}; drag or use left and right arrow keys to reorder"><span aria-hidden="true" class="column-drag-grip">↔</span> ${escapeHtml(p.name)}</button></th>`;
+      headHtml += `<th data-player-id="${escapeHtml(p.id)}"><button type="button" class="player-column-handle" data-player-id="${escapeHtml(p.id)}" title="Tap to edit; drag left or right to reorder" aria-label="Edit ${escapeHtml(p.name)}; drag or use left and right arrow keys to reorder">${escapeHtml(p.name)}</button></th>`;
     });
     theadRow.innerHTML = headHtml;
     bindPlayerColumnDragging(theadRow);

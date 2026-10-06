@@ -33,7 +33,7 @@ async function installTest(userAgent, standalone = false) {
 }
 async function offlineTest() {
   const events = {};
-  const entries = new Map([['/', new Response('cached app')], ['/styles.css?v=18', new Response('cached styles')]]);
+  const entries = new Map([['/', new Response('cached app')], ['/styles.css?v=19', new Response('cached styles')]]);
   const key = request => typeof request === 'string' ? request : new URL(request.url).pathname + new URL(request.url).search;
   const cache = { match: async request => entries.get(key(request)), put: async (request, response) => entries.set(key(request), response) };
   vm.runInNewContext(fs.readFileSync('public/service-worker.js', 'utf8'), {
@@ -49,7 +49,7 @@ async function offlineTest() {
   };
   const match = await respond({ method: 'GET', mode: 'navigate', url: 'https://gamescoresheets.web.app/?game=match_123' });
   assert.equal(await match.text(), 'cached app', 'Match URLs must fall back to the root app shell');
-  const style = await respond({ method: 'GET', mode: 'cors', url: 'https://gamescoresheets.web.app/styles.css?v=18' });
+  const style = await respond({ method: 'GET', mode: 'cors', url: 'https://gamescoresheets.web.app/styles.css?v=19' });
   assert.equal(await style.text(), 'cached styles');
   entries.clear();
   const recovery = await respond({ method: 'GET', mode: 'navigate', url: 'https://gamescoresheets.web.app/' });
